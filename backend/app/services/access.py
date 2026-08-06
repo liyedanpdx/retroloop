@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 
 from app.models.cycle import Cycle
 from app.models.project import Project
+from app.models.retro import Retrospective
 from app.models.user import User
 
 
@@ -51,3 +52,24 @@ async def get_cycle_for_facilitator(cycle_id: str, user: User) -> Cycle:
     cycle = await load_cycle(cycle_id)
     await get_project_for_facilitator(str(cycle.project_id), user)
     return cycle
+
+
+async def load_retro(retro_id: str) -> Retrospective:
+    retro = await Retrospective.get(parse_object_id(retro_id, "Retrospective not found"))
+    if retro is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Retrospective not found"
+        )
+    return retro
+
+
+async def get_retro_for_member(retro_id: str, user: User) -> Retrospective:
+    retro = await load_retro(retro_id)
+    await get_cycle_for_member(str(retro.cycle_id), user)
+    return retro
+
+
+async def get_retro_for_facilitator(retro_id: str, user: User) -> Retrospective:
+    retro = await load_retro(retro_id)
+    await get_cycle_for_facilitator(str(retro.cycle_id), user)
+    return retro

@@ -31,7 +31,8 @@ async def _get_own_card(card_id: str, user: User) -> FeedbackCard:
     """Load a card the caller is allowed to change.
 
     An anonymous card has no author_id, so nobody can prove they wrote it and
-    nobody may edit or delete it. See _docs/decisions.md, Feedback.
+    nobody may edit or delete it. Once the cycle leaves collecting the cards are
+    frozen for everyone. See _docs/decisions.md, Feedback.
     """
     card = await FeedbackCard.get(parse_object_id(card_id, "Card not found"))
     if card is None:
@@ -45,8 +46,14 @@ async def _get_own_card(card_id: str, user: User) -> FeedbackCard:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Only the author can do this"
         )
-    # Raises if the caller has since been removed from the card's project.
-    await get_cycle_for_member(str(card.cycle_id), user)
+
+    # Also raises if the caller has since been removed from the card's project.
+    cycle = await get_cycle_for_member(str(card.cycle_id), user)
+    if cycle.status != COLLECTING:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cards are frozen once the retrospective has started",
+        )
     return card
 
 

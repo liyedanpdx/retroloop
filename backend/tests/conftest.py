@@ -106,15 +106,14 @@ async def shared_cycle(client, auth_headers, project_with_member):
 
 
 @pytest.fixture
-async def reveal(client):
-    """Move a cycle into retro status, the way #6 eventually will."""
+async def reveal(client, auth_headers):
+    """Start the retro on a cycle, which reveals and freezes its cards."""
 
-    async def _reveal(cycle_id):
-        from app.models.cycle import RETRO, Cycle
-
-        stored = await Cycle.get(cycle_id)
-        stored.status = RETRO
-        await stored.save()
-        return stored
+    async def _reveal(cycle_id, headers=None):
+        resp = await client.post(
+            f"/api/cycles/{cycle_id}/retro", headers=headers or auth_headers
+        )
+        assert resp.status_code == 201, resp.text
+        return resp.json()
 
     return _reveal

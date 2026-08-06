@@ -6,6 +6,7 @@ from app.api.auth import router as auth_router
 from app.api.cycles import router as cycles_router
 from app.api.feedback import router as feedback_router
 from app.api.projects import router as projects_router
+from app.api.retros import router as retros_router
 from app.database import init_db
 
 
@@ -20,6 +21,7 @@ app.include_router(auth_router)
 app.include_router(projects_router)
 app.include_router(cycles_router)
 app.include_router(feedback_router)
+app.include_router(retros_router)
 
 
 @app.get("/api/health")

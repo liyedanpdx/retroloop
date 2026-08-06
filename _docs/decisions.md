@@ -32,6 +32,20 @@ hidden field is that same access wearing a different name.
 Consequence for the frontend (#15): the anonymous checkbox is a commitment. The
 UI should say so before the card is created, because there is no undo.
 
+### Cards freeze at reveal (issue #6)
+Once the cycle leaves `collecting`, feedback cards are read-only: `PATCH` and
+`DELETE /api/feedback/{id}` return 400. Creation is already blocked at that point.
+
+Raised by QA on #5. Without this, a member can reword or delete a card after the
+team has read it, and the retro is discussing something that no longer exists.
+The rest of the retro is built on cards being stable — #7 assigns them to
+clusters, #8 votes on those clusters — so a card changing underneath is not only
+dishonest, it corrupts state that has already been derived from it.
+
+The freeze belongs to #6 rather than a follow-up because #6 is what first makes
+`retro` status reachable through the API. Shipping reveal without it would ship a
+known hole.
+
 ### Making a card anonymous is one-way (issue #5)
 `PATCH` with `is_anonymous: true` drops `author_id`. The card cannot be changed
 back, and cannot be edited again afterwards, because the author is now unknown.
