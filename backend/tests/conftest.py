@@ -45,3 +45,34 @@ async def auth_headers(client, registered_user):
     )
     token = resp.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+async def second_user(client):
+    """A second registered account, for membership and isolation tests."""
+    resp = await client.post(
+        "/api/auth/register",
+        json={"email": "bob@example.com", "password": "secret456", "display_name": "Bob"},
+    )
+    return resp.json()
+
+
+@pytest.fixture
+async def second_auth_headers(client, second_user):
+    resp = await client.post(
+        "/api/auth/login",
+        json={"email": "bob@example.com", "password": "secret456"},
+    )
+    token = resp.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+async def project(client, auth_headers):
+    """A project created by alice, who is therefore its facilitator."""
+    resp = await client.post(
+        "/api/projects",
+        json={"name": "Team Alpha", "description": "our retro project"},
+        headers=auth_headers,
+    )
+    return resp.json()
