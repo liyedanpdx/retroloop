@@ -2,9 +2,9 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 
 from app.config import settings
+from app.models.user import User
 
-# Will be populated as models are added in later tasks
-DOCUMENT_MODELS: list = []
+DOCUMENT_MODELS: list = [User]
 
 
 async def init_db() -> None:

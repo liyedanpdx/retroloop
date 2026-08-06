@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     openai_base_url: str = "http://localhost:8080/v1"
     openai_api_key: str = ""
     jwt_secret: str = "change-me"
+    jwt_refresh_secret: str = "change-me-refresh"
 
     model_config = {"env_file": ".env"}
 
