@@ -7,6 +7,18 @@
 3. Engineer implements one groomed issue at a time
 4. Commit regularly, do not close the issue — leave a comment saying what you did
 
+## Branches
+
+One branch per issue, named `feat/<issue-number>-<short-slug>`.
+
+Each branch is cut from the previous issue's branch, not from `master`, because
+the backlog is ordered by dependency — #4 needs #3's project model, #5 needs #4's
+cycles. `master` therefore sits behind the work, and the tip of the chain is the
+branch for the highest-numbered finished issue.
+
+Nothing merges to `master` automatically. That is a deliberate call to make, not
+something an engineer does on the way past.
+
 ## Background
 
 - `_docs/decisions.md` — the calls already made, with reasons. Read it before
