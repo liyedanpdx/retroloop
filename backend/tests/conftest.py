@@ -76,3 +76,21 @@ async def project(client, auth_headers):
         headers=auth_headers,
     )
     return resp.json()
+
+
+@pytest.fixture
+async def project_with_member(client, auth_headers, project, second_user):
+    """Alice's project with bob added as a plain member."""
+    await client.post(
+        f"/api/projects/{project['id']}/members",
+        json={"email": "bob@example.com"},
+        headers=auth_headers,
+    )
+    return project
+
+
+@pytest.fixture
+async def cycle(client, auth_headers, project):
+    """An open collecting cycle on alice's project."""
+    resp = await client.post(f"/api/projects/{project['id']}/cycles", headers=auth_headers)
+    return resp.json()

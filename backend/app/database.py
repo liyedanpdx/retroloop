@@ -2,10 +2,11 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 
 from app.config import settings
+from app.models.cycle import Cycle
 from app.models.project import Project
 from app.models.user import User
 
-DOCUMENT_MODELS: list = [User, Project]
+DOCUMENT_MODELS: list = [User, Project, Cycle]
 
 
 async def init_db() -> None:
