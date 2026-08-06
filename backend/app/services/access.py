@@ -3,6 +3,7 @@
 from beanie import PydanticObjectId
 from fastapi import HTTPException, status
 
+from app.models.cycle import Cycle
 from app.models.project import Project
 from app.models.user import User
 
@@ -31,3 +32,22 @@ async def get_project_for_facilitator(project_id: str, user: User) -> Project:
             status_code=status.HTTP_403_FORBIDDEN, detail="Only the facilitator can do this"
         )
     return project
+
+
+async def load_cycle(cycle_id: str) -> Cycle:
+    cycle = await Cycle.get(parse_object_id(cycle_id, "Cycle not found"))
+    if cycle is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cycle not found")
+    return cycle
+
+
+async def get_cycle_for_member(cycle_id: str, user: User) -> Cycle:
+    cycle = await load_cycle(cycle_id)
+    await get_project_for_member(str(cycle.project_id), user)
+    return cycle
+
+
+async def get_cycle_for_facilitator(cycle_id: str, user: User) -> Cycle:
+    cycle = await load_cycle(cycle_id)
+    await get_project_for_facilitator(str(cycle.project_id), user)
+    return cycle

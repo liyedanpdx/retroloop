@@ -7,9 +7,10 @@ from app.models.cycle import ACTIVE_STATUSES, CLOSED, COLLECTING, Cycle
 from app.models.user import User
 from app.schemas.cycle import CycleResponse, UpdateCycleRequest
 from app.services.access import (
+    get_cycle_for_facilitator,
+    get_cycle_for_member,
     get_project_for_facilitator,
     get_project_for_member,
-    parse_object_id,
 )
 
 router = APIRouter(prefix="/api", tags=["cycles"])
@@ -24,25 +25,6 @@ def _to_response(cycle: Cycle) -> CycleResponse:
         closed_at=cycle.closed_at,
         created_by=str(cycle.created_by),
     )
-
-
-async def _load_cycle(cycle_id: str) -> Cycle:
-    cycle = await Cycle.get(parse_object_id(cycle_id, "Cycle not found"))
-    if cycle is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cycle not found")
-    return cycle
-
-
-async def _get_cycle_for_member(cycle_id: str, user: User) -> Cycle:
-    cycle = await _load_cycle(cycle_id)
-    await get_project_for_member(str(cycle.project_id), user)
-    return cycle
-
-
-async def _get_cycle_for_facilitator(cycle_id: str, user: User) -> Cycle:
-    cycle = await _load_cycle(cycle_id)
-    await get_project_for_facilitator(str(cycle.project_id), user)
-    return cycle
 
 
 @router.post(
@@ -76,7 +58,7 @@ async def list_cycles(project_id: str, user: User = Depends(get_current_user)):
 
 @router.get("/cycles/{cycle_id}", response_model=CycleResponse)
 async def get_cycle(cycle_id: str, user: User = Depends(get_current_user)):
-    cycle = await _get_cycle_for_member(cycle_id, user)
+    cycle = await get_cycle_for_member(cycle_id, user)
     return _to_response(cycle)
 
 
@@ -84,7 +66,7 @@ async def get_cycle(cycle_id: str, user: User = Depends(get_current_user)):
 async def update_cycle(
     cycle_id: str, body: UpdateCycleRequest, user: User = Depends(get_current_user)
 ):
-    cycle = await _get_cycle_for_facilitator(cycle_id, user)
+    cycle = await get_cycle_for_facilitator(cycle_id, user)
 
     # Only closing happens here. collecting -> retro is issue #6, via POST /cycles/{id}/retro.
     if body.status != CLOSED:

@@ -3,10 +3,11 @@ from beanie import init_beanie
 
 from app.config import settings
 from app.models.cycle import Cycle
+from app.models.feedback import FeedbackCard
 from app.models.project import Project
 from app.models.user import User
 
-DOCUMENT_MODELS: list = [User, Project, Cycle]
+DOCUMENT_MODELS: list = [User, Project, Cycle, FeedbackCard]
 
 
 async def init_db() -> None:

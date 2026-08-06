@@ -15,6 +15,27 @@ When any API call returns 401, the interceptor tries POST /api/auth/refresh
 once. If refresh succeeds, the original request is retried. If refresh fails,
 redirect to /login. Auth logic stays out of individual components.
 
+## Feedback
+
+### Anonymous cards cannot be edited or deleted (issue #5)
+`author_id` is `None` on an anonymous card, so the database has no way to tell
+who wrote it and no endpoint can check "are you the author?". Anonymous cards are
+therefore write-once: `PATCH` and `DELETE /api/feedback/{id}` return 403 for any
+caller.
+
+The alternative was a hidden owner reference used only for permission checks.
+Rejected: `_docs/outdated/architecture.md` states anonymous means "the document
+literally doesn't know who wrote it", and `plan.md` rejects facilitator-visible
+authorship because hidden administrator access discourages honest feedback. A
+hidden field is that same access wearing a different name.
+
+Consequence for the frontend (#15): the anonymous checkbox is a commitment. The
+UI should say so before the card is created, because there is no undo.
+
+### Making a card anonymous is one-way (issue #5)
+`PATCH` with `is_anonymous: true` drops `author_id`. The card cannot be changed
+back, and cannot be edited again afterwards, because the author is now unknown.
+
 ## Voting
 
 ### Vote submission is atomic (issue #8)

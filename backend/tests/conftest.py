@@ -94,3 +94,27 @@ async def cycle(client, auth_headers, project):
     """An open collecting cycle on alice's project."""
     resp = await client.post(f"/api/projects/{project['id']}/cycles", headers=auth_headers)
     return resp.json()
+
+
+@pytest.fixture
+async def shared_cycle(client, auth_headers, project_with_member):
+    """An open collecting cycle on a project alice and bob both belong to."""
+    resp = await client.post(
+        f"/api/projects/{project_with_member['id']}/cycles", headers=auth_headers
+    )
+    return resp.json()
+
+
+@pytest.fixture
+async def reveal(client):
+    """Move a cycle into retro status, the way #6 eventually will."""
+
+    async def _reveal(cycle_id):
+        from app.models.cycle import RETRO, Cycle
+
+        stored = await Cycle.get(cycle_id)
+        stored.status = RETRO
+        await stored.save()
+        return stored
+
+    return _reveal
