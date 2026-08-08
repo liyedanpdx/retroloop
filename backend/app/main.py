@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.api.auth import router as auth_router
+from app.api.clusters import router as clusters_router
 from app.api.cycles import router as cycles_router
 from app.api.feedback import router as feedback_router
 from app.api.projects import router as projects_router
@@ -22,6 +23,7 @@ app.include_router(projects_router)
 app.include_router(cycles_router)
 app.include_router(feedback_router)
 app.include_router(retros_router)
+app.include_router(clusters_router)
 
 
 @app.get("/api/health")

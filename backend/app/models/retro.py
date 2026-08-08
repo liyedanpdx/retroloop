@@ -27,8 +27,8 @@ def _now() -> datetime:
 
 class Cluster(BaseModel):
     id: str
-    label: str
-    card_ids: list[PydanticObjectId] = Field(default_factory=list)
+    name: str
+    created_at: datetime = Field(default_factory=_now)
 
 
 class Vote(BaseModel):

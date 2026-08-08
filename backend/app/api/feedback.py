@@ -14,7 +14,7 @@ from app.services.access import get_cycle_for_member, parse_object_id
 router = APIRouter(prefix="/api", tags=["feedback"])
 
 
-def _to_response(card: FeedbackCard) -> FeedbackResponse:
+def card_to_response(card: FeedbackCard) -> FeedbackResponse:
     return FeedbackResponse(
         id=str(card.id),
         cycle_id=str(card.cycle_id),
@@ -80,7 +80,7 @@ async def create_card(
         is_anonymous=body.is_anonymous,
     )
     await card.insert()
-    return _to_response(card)
+    return card_to_response(card)
 
 
 @router.get("/cycles/{cycle_id}/feedback", response_model=list[FeedbackResponse])
@@ -96,7 +96,7 @@ async def list_cards(cycle_id: str, user: User = Depends(get_current_user)):
     else:
         cards = await FeedbackCard.find(FeedbackCard.cycle_id == cycle.id).to_list()
 
-    return [_to_response(card) for card in cards]
+    return [card_to_response(card) for card in cards]
 
 
 @router.patch("/feedback/{card_id}", response_model=FeedbackResponse)
@@ -115,7 +115,7 @@ async def update_card(
         card.author_id = None
 
     await card.save()
-    return _to_response(card)
+    return card_to_response(card)
 
 
 @router.delete("/feedback/{card_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -73,3 +73,12 @@ async def get_retro_for_facilitator(retro_id: str, user: User) -> Retrospective:
     retro = await load_retro(retro_id)
     await get_cycle_for_facilitator(str(retro.cycle_id), user)
     return retro
+
+
+def require_phase(retro: Retrospective, phase: str) -> None:
+    """Phase-gated work is refused outside its phase, for everyone."""
+    if retro.phase != phase:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Only available during the {phase} phase",
+        )
