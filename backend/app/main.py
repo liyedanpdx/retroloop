@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from app.api.auth import router as auth_router
 from app.api.clusters import router as clusters_router
 from app.api.cycles import router as cycles_router
+from app.api.discussion import router as discussion_router
 from app.api.feedback import router as feedback_router
 from app.api.projects import router as projects_router
 from app.api.retros import router as retros_router
@@ -26,6 +27,7 @@ app.include_router(feedback_router)
 app.include_router(retros_router)
 app.include_router(clusters_router)
 app.include_router(votes_router)
+app.include_router(discussion_router)
 
 
 @app.get("/api/health")

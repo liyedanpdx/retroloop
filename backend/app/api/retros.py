@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.deps import get_current_user
 from app.models.cycle import CLOSED, RETRO
-from app.models.retro import Retrospective, next_phase
+from app.models.retro import DISCUSS, Retrospective, next_phase
 from app.models.user import User
 from app.schemas.retro import RetroResponse, UpdatePhaseRequest
 from app.services.access import (
@@ -10,6 +10,7 @@ from app.services.access import (
     get_retro_for_facilitator,
     get_retro_for_member,
 )
+from app.services.discussion import create_topics, topic_to_dict
 
 router = APIRouter(prefix="/api", tags=["retros"])
 
@@ -26,7 +27,9 @@ def _to_response(retro: Retrospective) -> RetroResponse:
         votes=[
             v.model_dump(mode="json", include={"user_id", "submitted_at"}) for v in retro.votes
         ],
-        topics=[t.model_dump(mode="json") for t in retro.topics],
+        # Each topic carries its cluster's name, resolved here rather than
+        # stored on the topic (#9). #11 and #16 read it off this payload.
+        topics=[topic_to_dict(retro, t) for t in retro.topics],
         decisions=[d.model_dump(mode="json") for d in retro.decisions],
         actions=[a.model_dump(mode="json") for a in retro.actions],
         transcript=retro.transcript,
@@ -90,5 +93,10 @@ async def update_phase(
         )
 
     retro.phase = allowed
+    # Entering `discuss` is what closes voting, so it is also what turns the
+    # tally into an agenda (#9). In-process, not over HTTP — a handler cannot
+    # call its own API, which is why `tally()` lives in a service at all.
+    if allowed == DISCUSS:
+        create_topics(retro)
     await retro.save()
     return _to_response(retro)

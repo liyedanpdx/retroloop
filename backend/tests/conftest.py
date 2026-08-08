@@ -218,3 +218,35 @@ async def voting_retro(clustering_retro, add_cluster, advance_phase):
     ]
     retro = await advance_phase(retro["id"], "vote")
     return {"cycle": clustering_retro["cycle"], "retro": retro, "clusters": clusters}
+
+
+@pytest.fixture
+async def discussion_retro(client, auth_headers, second_auth_headers, voting_retro, advance_phase):
+    """A retro in the discuss phase, with ballots cast and topics generated.
+
+    Both members vote before the advance so the tally is not a wall of zeroes —
+    Flow gets three votes, Tooling one, Meetings none — and the topics come out
+    ranked rather than accidentally in insertion order.
+
+    Alice is the facilitator, bob a plain member, and `outsider_auth_headers`
+    belongs to neither.
+
+    Returns `{"cycle": ..., "retro": ..., "clusters": [...], "topics": [...]}`,
+    the topics in the order the retro stores them.
+    """
+    retro = voting_retro["retro"]
+    flow, tooling, _ = [c["id"] for c in voting_retro["clusters"]]
+
+    for headers, ballot in ((auth_headers, [flow, flow, tooling]), (second_auth_headers, [flow])):
+        resp = await client.post(
+            f"/api/retros/{retro['id']}/votes", json={"cluster_ids": ballot}, headers=headers
+        )
+        assert resp.status_code == 201, resp.text
+
+    retro = await advance_phase(retro["id"], "discuss")
+    return {
+        "cycle": voting_retro["cycle"],
+        "retro": retro,
+        "clusters": voting_retro["clusters"],
+        "topics": retro["topics"],
+    }
