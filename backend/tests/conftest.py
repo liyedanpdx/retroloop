@@ -183,3 +183,38 @@ async def clustering_retro(client, shared_cycle, add_card, reveal, advance_phase
     retro = await reveal(shared_cycle["id"])
     retro = await advance_phase(retro["id"], "cluster")
     return {"cycle": shared_cycle, "retro": retro, "cards": cards}
+
+
+@pytest.fixture
+async def add_cluster(client, auth_headers):
+    """Put a cluster on a retro. Only works while the retro is in the cluster phase."""
+
+    async def _add_cluster(retro_id, name="Flow", headers=None):
+        resp = await client.post(
+            f"/api/retros/{retro_id}/clusters",
+            json={"name": name},
+            headers=headers or auth_headers,
+        )
+        assert resp.status_code == 201, resp.text
+        return resp.json()
+
+    return _add_cluster
+
+
+@pytest.fixture
+async def voting_retro(clustering_retro, add_cluster, advance_phase):
+    """A retro in the vote phase with three clusters already on it.
+
+    The clusters are created here because they can only be created during the
+    cluster phase, which the vote phase is already past. Alice and bob are both
+    members of the underlying project — two eligible voters — and
+    `outsider_auth_headers` belongs to neither.
+
+    Returns `{"cycle": ..., "retro": ..., "clusters": [...]}`.
+    """
+    retro = clustering_retro["retro"]
+    clusters = [
+        await add_cluster(retro["id"], name=name) for name in ("Flow", "Tooling", "Meetings")
+    ]
+    retro = await advance_phase(retro["id"], "vote")
+    return {"cycle": clustering_retro["cycle"], "retro": retro, "clusters": clusters}
