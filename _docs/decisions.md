@@ -86,6 +86,28 @@ transcript text. Audio/video can be a separate post-MVP issue.
 AI-extracted items are never auto-saved as confirmed decisions/actions. The
 facilitator must explicitly confirm each one.
 
+### httpx is the runtime HTTP client (issues #19, #10)
+`httpx` moves from `[project.optional-dependencies] dev` to `[project]
+dependencies` in `backend/pyproject.toml`. This is the dependency approval
+`AGENTS.md` requires, granted once, for `httpx` only.
+
+Raised by the PM on #7 and split into #19 as a blocker. Of the three options
+recorded there, this is the first: it is already installed in the `newpython`
+env, already pulled in transitively by Starlette, and already the client the
+tests use — so promoting it adds no new package to the lockfile, it only makes
+an existing one honest about where it is used. The `openai` SDK was rejected as
+heavier than anything else the project depends on, for a single POST to one
+endpoint whose response shape we control.
+
+The approval does not generalise. Any other backend dependency still needs its
+own decision here first.
+
+### One model name, one setting (issues #19, #10)
+The proxy model is a setting, `openai_model`, defaulting to `gpt-5.4`, not a
+literal in the extraction code. `Settings` forbids extra keys, so a model name
+in `.env` without a matching field is a hard startup failure — the field and
+the `.env.example` line land in the same change.
+
 ### Owner matching is best-effort (issue #10)
 AI extraction returns owner names as strings. The backend does a best-effort
 match against project member display names. Unmatched owners are flagged for
@@ -160,6 +182,24 @@ scope small.
 The team uses MongoDB Atlas or a shared local instance. Including MongoDB in
 compose would create a second database that diverges. The .env file points
 to whatever MongoDB the team uses.
+
+### Tests run against a real MongoDB, in their own database
+There is no in-process Mongo. `tests/conftest.py` points at `MONGO_URL` and uses
+the database named `{MONGO_DB_NAME}_test`, wiping its collections between tests.
+Two consequences worth knowing before running the suite:
+
+- The suite is slow — roughly three minutes for ~100 tests, because every test
+  pays a round trip to init Beanie and another to clean up. Budget for it rather
+  than assuming a hang.
+- `MONGO_DB_NAME` must never name a database that holds anything you care about.
+  The teardown empties every collection in `{name}_test`.
+
+### Secrets live in an untracked .env, never in the repo
+`.env` at the repo root (compose) and `backend/.env` (pytest and uvicorn, which
+resolve `env_file` relative to the working directory). Both are covered by the
+root `.gitignore` rule `.env`, which is pathless and so matches at any depth.
+`.env.example` carries the key names with placeholder values and is the only one
+of the three that is committed.
 
 ### Multi-stage frontend Dockerfile (issue #18)
 Dev mode uses vite dev with hot reload (mounted volume). Prod mode builds
