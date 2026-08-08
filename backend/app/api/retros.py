@@ -20,7 +20,12 @@ def _to_response(retro: Retrospective) -> RetroResponse:
         cycle_id=str(retro.cycle_id),
         phase=retro.phase,
         clusters=[c.model_dump(mode="json") for c in retro.clusters],
-        votes=[v.model_dump(mode="json") for v in retro.votes],
+        # Who has submitted, never what they submitted. Handing the raw ballots
+        # to any member would make hiding the results until voting closes (#8)
+        # theatre — during the vote phase you could read every ballot off here.
+        votes=[
+            v.model_dump(mode="json", include={"user_id", "submitted_at"}) for v in retro.votes
+        ],
         topics=[t.model_dump(mode="json") for t in retro.topics],
         decisions=[d.model_dump(mode="json") for d in retro.decisions],
         actions=[a.model_dump(mode="json") for a in retro.actions],
