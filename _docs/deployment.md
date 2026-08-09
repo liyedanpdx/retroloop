@@ -73,6 +73,39 @@ The two are separate files rather than a base and an override, so the production
 run cannot inherit a bind mount or a reload flag by accident. They do collide on
 ports, so bring one down before starting the other.
 
+## Things the first real run found
+
+There is also no `newpython` conda env on record on any machine this has been
+tried on yet — the 612-test backend suite referenced below has never actually
+been run outside of review. Treat a green Docker deploy as covering less than
+it looks like it covers until someone builds that env and runs it for real.
+
+**Backend would not import: `email-validator is not installed`.** `User`
+(`backend/app/models/user.py`) uses `pydantic.EmailStr`, which pydantic only
+supports with `email-validator` installed — it was never added to
+`backend/pyproject.toml`, so a build from a clean image crashes on the first
+import of `app.main`. Fixed by adding `email-validator>=2.0` as a dependency.
+
+**Frontend and prod-nginx healthchecks reported `unhealthy` while serving
+fine.** Both use `wget ... http://localhost:PORT/`, and both images are
+Alpine (musl). Alpine resolves `localhost` to `::1` first; Vite and nginx
+listen on `0.0.0.0` only, so the IPv6 attempt gets connection-refused and the
+healthcheck never passes even though `curl`ing the container's IPv4 address
+works. The backend healthcheck (`python:3.13-slim`, glibc) does not hit this.
+Fixed by pointing both `wget` checks at `127.0.0.1` instead of `localhost`.
+
+**Every registration and login returned 500.** `backend/pyproject.toml` pinned
+only `passlib[bcrypt]>=1.7`, and a clean install resolves that to whatever
+`bcrypt` is newest — 5.0.0 at the time this was found. Recent `bcrypt`
+releases raise on secrets over 72 bytes instead of truncating them, and
+passlib 1.7.4 (unmaintained since 2020) runs a self-test at backend-init time
+that hits exactly that path, so `hash_password`/`verify_password` broke for
+every password, not just long ones. Fixed by pinning `bcrypt>=3.1.0,<4.1` in
+`backend/pyproject.toml`; resolves to 4.0.1. Separately, `RegisterRequest` had
+no length check on `password`, so even with a working bcrypt a password over
+72 UTF-8 bytes would still 500 instead of getting a 422 — added a validator
+for that in `backend/app/schemas/auth.py`.
+
 ## Confirming it actually came up
 
 `up -d` returning 0 means the containers were created, not that the app works.
