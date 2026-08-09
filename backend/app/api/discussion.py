@@ -33,6 +33,7 @@ from app.models.retro import DISCUSS, Action, Decision, Retrospective, Topic
 from app.models.user import User
 from app.schemas.discussion import (
     ActionResponse,
+    CreateTopicRequest,
     CreateActionRequest,
     CreateDecisionRequest,
     DecisionResponse,
@@ -47,7 +48,13 @@ from app.services.access import (
     get_retro_for_member,
     require_writable_phase,
 )
-from app.services.discussion import owner_state, topic_name
+from app.services.discussion import (
+    move_topic,
+    orphan_topic_items,
+    owner_state,
+    renumber_topics,
+    topic_name,
+)
 from app.services.realtime import broadcast
 from app.services.votes import load_project_for_retro
 
@@ -182,11 +189,22 @@ async def update_topic(
     topic = _find_topic(retro, topic_id)
 
     sent = body.model_fields_set
-    before = (topic.status, topic.notes)
+    before = (topic.status, topic.notes, topic.name_override, topic.rank)
     if "status" in sent and body.status is not None:
         topic.status = body.status
     if "notes" in sent and body.notes is not None:
         topic.notes = body.notes
+    if "name" in sent:
+        # Sending null clears the override, and the cluster's name comes back.
+        # A topic with no cluster has nothing to fall back to, so it keeps one.
+        if body.name is None and topic.cluster_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A topic with no cluster needs a name",
+            )
+        topic.name_override = body.name
+    if "rank" in sent and body.rank is not None:
+        move_topic(retro, topic, body.rank)
 
     await save_retro(retro)
 
@@ -194,9 +212,57 @@ async def update_topic(
     # An empty body and a body repeating the stored values are both no-ops, and
     # a no-op is not an event (#12). Comparing the values rather than trusting
     # `model_fields_set` is what makes the second case quiet too.
-    if (topic.status, topic.notes) != before:
+    if (topic.status, topic.notes, topic.name_override, topic.rank) != before:
         await broadcast(str(retro.id), "topic_updated", response.model_dump(mode="json"))
     return response
+
+
+@router.post(
+    "/retros/{retro_id}/topics",
+    response_model=TopicResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_topic(
+    retro_id: str, body: CreateTopicRequest, user: User = Depends(get_current_user)
+):
+    """A topic the vote did not produce (#22).
+
+    #9 generates one per cluster and that is still what happens on entering
+    `discuss`; this is for the thing somebody raised in the room that nobody had
+    written a card for. It has no cluster and no votes, and says so — a manual
+    topic showing `0 votes` is accurate, not a gap.
+    """
+    retro = await _facilitator_retro(retro_id, user)
+
+    topic = Topic(id=str(uuid4()), cluster_id=None, name_override=body.name)
+    retro.topics.append(topic)
+    move_topic(retro, topic, body.rank if body.rank is not None else len(retro.topics))
+    await save_retro(retro)
+
+    response = _topic_response(retro, topic)
+    await broadcast(str(retro.id), "topic_created", response.model_dump(mode="json"))
+    return response
+
+
+@router.delete("/retros/{retro_id}/topics/{topic_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_topic(retro_id: str, topic_id: str, user: User = Depends(get_current_user)):
+    """Drop a topic. Its decisions and actions are unlinked, never deleted (#22).
+
+    Cascading would destroy what the team agreed because somebody tidied an
+    agenda; refusing would make the delete useless exactly when it is wanted.
+    #11 and #16 render null-topic items under "Unlinked", so there is somewhere
+    for them to go.
+    """
+    retro = await _facilitator_retro(retro_id, user)
+    _find_topic(retro, topic_id)
+
+    retro.topics = [topic for topic in retro.topics if topic.id != topic_id]
+    orphan_topic_items(retro, topic_id)
+    renumber_topics(retro)
+    await save_retro(retro)
+
+    await broadcast(str(retro.id), "topic_deleted", {"id": topic_id})
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # --- decisions ---------------------------------------------------------------

@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 class SummaryTopic(BaseModel):
     id: str
-    cluster_id: str
+    cluster_id: str | None
     name: str
     vote_count: int
     rank: int

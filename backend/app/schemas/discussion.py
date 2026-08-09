@@ -32,16 +32,43 @@ def _strip_or_reject(value: str | None) -> str | None:
     return stripped
 
 
-class UpdateTopicRequest(BaseModel):
-    """`status` and `notes` are the only mutable fields on a topic.
+class CreateTopicRequest(BaseModel):
+    """A topic nobody wrote a card for (#22). The name is required.
 
-    `cluster_id`, `vote_count` and `rank` are a snapshot of the tally and are
-    absent on purpose; pydantic ignores them if sent, so an attempt to move a
-    topic's rank quietly changes nothing rather than half-succeeding.
+    There is no `cluster_id`: a manual topic has no cluster by definition, and
+    letting a caller attach one would make two topics able to claim the same
+    cluster with different names.
+    """
+
+    name: str = Field(min_length=1)
+    rank: int | None = None
+
+    @field_validator("name")
+    @classmethod
+    def name_is_not_blank(cls, value: str) -> str:
+        return _strip_or_reject(value)
+
+
+class UpdateTopicRequest(BaseModel):
+    """What a facilitator may change on a topic (#9's two, plus #22's two).
+
+    `vote_count` is absent on purpose and always will be: it is the tally's
+    snapshot, and a topic whose vote count could be edited would make the
+    summary a claim rather than a record.
+
+    `name` is an override — sending null clears it and the cluster's name comes
+    back. `rank` is a 1-based position; the other topics close up around it.
     """
 
     status: TopicStatus | None = None
     notes: str | None = None
+    name: str | None = Field(default=None, min_length=1)
+    rank: int | None = Field(default=None, ge=1)
+
+    @field_validator("name")
+    @classmethod
+    def name_is_not_blank(cls, value: str | None) -> str | None:
+        return _strip_or_reject(value)
 
 
 class CreateDecisionRequest(BaseModel):
@@ -92,7 +119,8 @@ class UpdateActionRequest(BaseModel):
 
 class TopicResponse(BaseModel):
     id: str
-    cluster_id: str
+    # 手工加的 topic 没有 cluster (#22)。
+    cluster_id: str | None
     name: str
     vote_count: int
     rank: int

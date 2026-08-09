@@ -159,6 +159,35 @@ Topics are generated automatically when entering the discuss phase — the
 facilitator does not manually create them. One topic per cluster, ranked
 by vote count.
 
+### The facilitator may shape the agenda afterwards (issue #22)
+#9's generation is still what happens on entering `discuss`, and is still the
+only thing that happens there. #22 adds what comes next: `POST` a topic nobody
+wrote a card for, `DELETE` one, rename one, and reorder them — facilitator only,
+`discuss` only, through the same guards as everything else.
+
+The four awkward parts, decided:
+
+**`rank` is the agenda order, `vote_count` is the tally.** They used to be the
+same number. `rank` now defaults to the tally's order and is editable after
+that, which is what #11 sorts the summary on and what the word already promised.
+`vote_count` never moves, and there is no field to edit it — a topic whose vote
+count could be changed would make the summary a claim rather than a record.
+
+**A rename is `Topic.name_override`, not a stored `name`.** With a plain name
+field a topic and its cluster can disagree with no way to tell which is stale.
+An override is unambiguous: somebody chose this, and clearing it brings the
+cluster's name back.
+
+**`Topic.cluster_id` is nullable**, because a topic raised in the room came from
+no cluster. A topic with no cluster must carry an override, since it has nothing
+to fall back to — clearing the last name is a `400`.
+
+**Deleting a topic unlinks its decisions and actions**, setting `topic_id` to
+null. Not a cascade: that would destroy what the team agreed because somebody
+tidied an agenda. Not a refusal either: that makes the delete useless exactly
+when it is wanted. #11 and #16 already render null-topic items under "Unlinked",
+so there is somewhere for them to land.
+
 ### Action owner permissions (issue #9)
 Action owners can only update `status` and `due_date` on their own items,
 not `description` or `owner_id`. Only the facilitator can reassign or

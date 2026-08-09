@@ -74,21 +74,28 @@ class Vote(BaseModel):
 
 
 class Topic(BaseModel):
-    """One cluster, promoted to something the team actually talks about (#9).
+    """Something the team talks about — usually a cluster, sometimes not (#9, #22).
 
-    Generated from `tally()` on entering `discuss`, never by hand. There is
-    deliberately no `name`: the name is the cluster's, the cluster is in this
-    same document, and cluster writes stopped when the `cluster` phase ended
-    (#7) — so a stored copy could only duplicate a value that can no longer
-    change. `app/services/discussion.py` resolves it into responses instead.
+    #9 generates one per cluster from `tally()` on entering `discuss`. #22 lets
+    the facilitator add, rename, reorder and remove them afterwards, and the
+    three optional-looking fields below are what that costs.
 
-    `vote_count` and `rank` are a snapshot taken at generation, not a live view.
-    Voting is over by then and there is no retraction (#8), so nothing can move
-    them afterwards. Only `status` and `notes` are mutable.
+    `cluster_id` is nullable because a topic somebody raised in the room came
+    from no cluster. `name_override` exists because a rename needs somewhere to
+    live: a plain `name` field would let a topic and its cluster disagree with
+    no way to tell which is stale, whereas an override is unambiguous — somebody
+    chose this, and clearing it goes back to the cluster's name. A topic with no
+    cluster must have one.
+
+    `vote_count` stays the tally's snapshot and never moves. `rank` no longer
+    means "vote order": it is the agenda order, defaulting to the tally's and
+    editable afterwards, which is what #11 sorts the summary on and what the
+    word already promised.
     """
 
     id: str
-    cluster_id: str
+    cluster_id: str | None = None
+    name_override: str | None = None
     vote_count: int = 0
     rank: int = 0
     status: str = TOPIC_STATUSES[0]
