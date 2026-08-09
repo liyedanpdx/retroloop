@@ -57,13 +57,14 @@ class StubbedProxy:
 def ai_proxy(monkeypatch):
     """Autouse, so no test can make a network call by forgetting to stub (#10).
 
-    Both bindings are replaced: the one `app/services/transcript.py` imported,
-    which is what the running code calls, and the one on `app/services/ai.py`
-    itself, so #19's caller is covered by the same fixture.
+    Every binding is replaced: the two importers, `app/services/transcript.py`
+    (#10) and `app/services/cluster_suggestions.py` (#19), which are what the
+    running code calls, and the one on `app/services/ai.py` itself.
     """
     proxy = StubbedProxy()
     monkeypatch.setattr("app.services.ai.chat_json", proxy.chat_json)
     monkeypatch.setattr("app.services.transcript.chat_json", proxy.chat_json)
+    monkeypatch.setattr("app.services.cluster_suggestions.chat_json", proxy.chat_json)
     return proxy
 
 

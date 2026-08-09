@@ -7,14 +7,23 @@ from app.deps import get_current_user
 from app.models.feedback import FeedbackCard
 from app.models.retro import CLUSTER, Cluster, Retrospective
 from app.models.user import User
-from app.schemas.cluster import ClusterNameRequest, ClusterResponse, MoveCardRequest
+from app.schemas.cluster import (
+    ClusterNameRequest,
+    ClusterResponse,
+    ClusterSuggestionResponse,
+    MoveCardRequest,
+    SuggestClustersRequest,
+)
 from app.schemas.feedback import FeedbackResponse
 from app.services.access import (
     get_cycle_for_member,
+    get_retro_for_facilitator,
     get_retro_for_member,
     parse_object_id,
     require_phase,
 )
+from app.services.ai import ProxyError, ProxyMalformedResponse, ProxyTimeout
+from app.services.cluster_suggestions import suggest_clusters
 from app.services.realtime import broadcast
 
 router = APIRouter(prefix="/api", tags=["clusters"])
@@ -54,6 +63,44 @@ async def create_cluster(
     response = _to_response(cluster)
     await broadcast(str(retro.id), "cluster_created", response.model_dump(mode="json"))
     return response
+
+
+@router.post("/retros/{retro_id}/clusters/suggest", response_model=ClusterSuggestionResponse)
+async def suggest_clusters_for_retro(
+    retro_id: str,
+    body: SuggestClustersRequest,
+    user: User = Depends(get_current_user),
+):
+    """Ask the proxy how it would group this cycle's cards. Changes nothing.
+
+    Facilitator-only, unlike the rest of this module: creating and renaming a
+    cluster is teamwork, but spending the project's AI budget is not something
+    any member should be able to do on a loop.
+
+    The three failures are told apart because the client can act on them
+    differently — a timeout is worth retrying, an invalid answer is worth
+    retrying once, and an unavailable proxy is worth telling somebody about. The
+    details are fixed strings: an upstream body or URL on a 502 would be a proxy
+    endpoint leaked to every member of the project.
+    """
+    retro = await get_retro_for_facilitator(retro_id, user)
+    require_phase(retro, CLUSTER)
+
+    try:
+        return await suggest_clusters(retro)
+    except ProxyTimeout:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail="AI suggestion timed out"
+        )
+    except ProxyMalformedResponse:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="AI returned invalid cluster suggestions",
+        )
+    except ProxyError:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail="AI suggestion unavailable"
+        )
 
 
 @router.patch("/retros/{retro_id}/clusters/{cluster_id}", response_model=ClusterResponse)
