@@ -114,5 +114,6 @@ class ActionResponse(BaseModel):
     topic_id: str | None
     description: str
     owner_id: str | None
+    owner_name: str | None = Field(default=None, exclude_if=lambda value: value is None)
     status: str
     due_date: datetime | None

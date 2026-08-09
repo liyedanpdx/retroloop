@@ -10,6 +10,63 @@ from app.main import app
 TEST_DB_NAME = f"{settings.mongo_db_name}_test"
 
 
+class UnstubbedProxyCall(BaseException):
+    """A test reached the AI proxy without saying what it should answer.
+
+    Deliberately not an `Exception`: `run_extraction` catches `Exception` so a
+    dead proxy becomes a stored `failed` status, and this must not be quietly
+    turned into one. A forgotten stub has to fail the test, loudly, rather than
+    dial a real server from the suite.
+    """
+
+
+class StubbedProxy:
+    """The proxy, as every test sees it. Nothing here touches the network.
+
+    A test says what the proxy does — `returns(...)` for an answer,
+    `raises(...)` for a failure, `answers(fn)` for anything conditional — and
+    can read `calls` afterwards to check what was asked.
+    """
+
+    def __init__(self):
+        self.calls = []
+        self._answer = None
+
+    def answers(self, handler):
+        self._answer = handler
+
+    def returns(self, payload: dict):
+        self.answers(lambda system, user: payload)
+
+    def raises(self, error: BaseException):
+        def _raise(system, user):
+            raise error
+
+        self.answers(_raise)
+
+    async def chat_json(self, system: str, user: str) -> dict:
+        self.calls.append({"system": system, "user": user})
+        if self._answer is None:
+            raise UnstubbedProxyCall(
+                "the AI proxy was called without a stub — configure ai_proxy in this test"
+            )
+        return self._answer(system, user)
+
+
+@pytest.fixture(autouse=True)
+def ai_proxy(monkeypatch):
+    """Autouse, so no test can make a network call by forgetting to stub (#10).
+
+    Both bindings are replaced: the one `app/services/transcript.py` imported,
+    which is what the running code calls, and the one on `app/services/ai.py`
+    itself, so #19's caller is covered by the same fixture.
+    """
+    proxy = StubbedProxy()
+    monkeypatch.setattr("app.services.ai.chat_json", proxy.chat_json)
+    monkeypatch.setattr("app.services.transcript.chat_json", proxy.chat_json)
+    return proxy
+
+
 @pytest.fixture(autouse=True)
 async def init_test_db():
     client = AsyncIOMotorClient(settings.mongo_url)
@@ -249,4 +306,51 @@ async def discussion_retro(client, auth_headers, second_auth_headers, voting_ret
         "retro": retro,
         "clusters": voting_retro["clusters"],
         "topics": retro["topics"],
+    }
+
+
+@pytest.fixture
+async def transcript_retro(client, auth_headers, discussion_retro, ai_proxy):
+    """The discuss-phase retro with one extraction already finished (#10).
+
+    The stubbed answer is deliberately mixed: one decision, one action whose
+    owner is bob — a current member, so it matches — and one action naming
+    somebody who is not on the project, so it does not. That is enough setup for
+    every confirm test to work from without pasting again.
+
+    Returns `{"cycle": ..., "retro": ..., "topics": [...], "suggestions": ...,
+    "decision": ..., "action": ..., "unmatched_action": ...}`, the suggestions
+    being the document as `GET /suggestions` returns it.
+    """
+    retro = discussion_retro["retro"]
+    ai_proxy.returns(
+        {
+            "decisions": [{"text": "Ship the migration behind a flag"}],
+            "actions": [
+                {"description": "Write the runbook", "owner": "Bob", "due_date": None},
+                {"description": "Book the room", "owner": "Dana Wu", "due_date": None},
+            ],
+        }
+    )
+
+    resp = await client.post(
+        f"/api/retros/{retro['id']}/transcript",
+        json={"text": "alice: let us ship behind a flag. bob: I will write the runbook."},
+        headers=auth_headers,
+    )
+    assert resp.status_code == 202, resp.text
+
+    read = await client.get(f"/api/retros/{retro['id']}/suggestions", headers=auth_headers)
+    assert read.status_code == 200, read.text
+    suggestions = read.json()
+    assert suggestions["status"] == "ready", suggestions
+
+    return {
+        "cycle": discussion_retro["cycle"],
+        "retro": retro,
+        "topics": discussion_retro["topics"],
+        "suggestions": suggestions,
+        "decision": suggestions["decisions"][0],
+        "action": suggestions["actions"][0],
+        "unmatched_action": suggestions["actions"][1],
     }

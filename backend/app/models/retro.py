@@ -22,6 +22,22 @@ TOPIC_STATUSES = ("pending", "discussed", "skipped", "deferred")
 # An action item is open until somebody does it (#9).
 ACTION_STATUSES = ("open", "done")
 
+# Where a transcript extraction stands (#10). `idle` is never stored — it is what
+# a retro with no `ai_suggestions` at all reads as — and the other three are the
+# only values `ai_suggestions["status"]` ever holds. #17 polls this field.
+EXTRACTION_STATUSES = ("idle", "processing", "ready", "failed")
+
+# Where one AI suggestion stands. Nothing is deleted on confirm or reject, so the
+# facilitator can see what became of every extracted line (#10).
+SUGGESTION_STATES = ("pending", "confirmed", "rejected")
+
+# About a two-hour meeting. A body-shape rule, so over it is 422 (#10).
+MAX_TRANSCRIPT_CHARS = 100_000
+
+# The hard ceiling on one proxy call. Without it a hung proxy would leave the
+# retro stuck on `processing`, and a paste is refused while it is (#10).
+PROXY_TIMEOUT_SECONDS = 60
+
 
 def next_phase(current: str) -> str | None:
     """The only phase that may follow `current`, or None at the end."""

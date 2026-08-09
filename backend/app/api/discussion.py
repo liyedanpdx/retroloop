@@ -143,6 +143,7 @@ def _action_response(action: Action) -> ActionResponse:
         topic_id=action.topic_id,
         description=action.description,
         owner_id=None if action.owner_id is None else str(action.owner_id),
+        owner_name=action.owner_name,
         status=action.status,
         due_date=action.due_date,
     )
