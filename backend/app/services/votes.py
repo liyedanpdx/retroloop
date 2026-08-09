@@ -11,12 +11,13 @@ no user ids, which is the whole point of hiding results until voting closes.
 
 from collections import Counter
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from beanie import PydanticObjectId
 from fastapi import HTTPException, status
 
 from app.models.project import Project
-from app.models.retro import DISCUSS, DONE, Retrospective
+from app.models.retro import DISCUSS, DONE, VOTE, Retrospective
 from app.services.access import load_cycle
 
 # Reaching either of these means the facilitator has closed voting.
@@ -76,15 +77,36 @@ def everyone_has_voted(retro: Retrospective, project: Project) -> bool:
 
 
 def results_are_open(retro: Retrospective, project: Project) -> bool:
-    """Results are readable once voting is over, by either route.
+    """Results are readable once they have ever been readable (#21).
 
-    The facilitator advancing to `discuss` is what closes voting, and a retro
-    where every current member has already submitted has nothing left to wait
-    for. Reaching the second case does not advance the phase — phases move only
-    when the facilitator moves them (#6), and #9 hangs topic creation off
-    entering `discuss`.
+    The stored timestamp is the authority, not a member count that can move.
+    Before #21 this asked "is everybody current voted?", which meant removing
+    the last non-voter silently published the tally, and — worse — adding a
+    member afterwards could take it away again. Visibility has to be monotonic
+    for withdrawal to have a boundary at all.
+
+    The phase check stays for retros created before the field existed, and
+    because reaching `discuss` is still what closing voting means.
     """
-    return retro.phase in RESULT_PHASES or everyone_has_voted(retro, project)
+    return retro.phase in RESULT_PHASES or retro.voting_results_opened_at is not None
+
+
+def open_results(retro: Retrospective, project: Project) -> bool:
+    """Stamp the moment results first became visible. Returns whether it did.
+
+    Called by the two operations that can open them: a ballot that completes
+    the current membership, and the facilitator advancing out of `vote`. It is
+    idempotent — the first stamp is the one that stands.
+    """
+    if retro.voting_results_opened_at is not None:
+        return False
+    retro.voting_results_opened_at = datetime.now(timezone.utc)
+    return True
+
+
+def retraction_is_open(retro: Retrospective) -> bool:
+    """A ballot may be withdrawn only before anybody could have seen the tally."""
+    return retro.phase == VOTE and retro.voting_results_opened_at is None
 
 
 def tally(retro: Retrospective) -> list[ClusterTally]:

@@ -132,6 +132,26 @@ leave the remaining voters ready, the facilitator may advance normally. This
 preserves #8's anti-gaming boundary while giving a member a way to correct a
 mistake before anyone can see the tally.
 
+### Results visibility is a stored timestamp, not a count (issue #21)
+`Retrospective.voting_results_opened_at`, set once by whichever comes first — a
+ballot that completes the then-current membership, or the facilitator advancing
+out of `vote` — and never cleared or moved. `results_are_open()` reads it.
+
+It used to ask "has every current member voted?", which had two faults that only
+appear when the member list moves. Removing the last non-voter silently
+published the tally, and adding a member afterwards could take it away again.
+Withdrawal needs a boundary that cannot move backwards, so the boundary is a
+fact about the past rather than a question about the present.
+
+### Withdrawal is one conditional write (issue #21)
+`DELETE /api/retros/{id}/votes` ends in a single `update_one` filtered on the
+results still being closed *and* this caller's ballot still being there. Two
+simultaneous withdrawals therefore produce one `204` and one `404`, and a
+withdrawal racing the submission that opens results loses — rather than both
+reading a stale document and both succeeding. When the conditional write matches
+nothing, the document decides which answer is right: `409` if results opened,
+`404` if the ballot had already gone.
+
 ## Discussion
 
 ### Topic auto-creation (issue #9)

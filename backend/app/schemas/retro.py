@@ -17,6 +17,7 @@ class RetroResponse(BaseModel):
     topics: list[dict]
     decisions: list[dict]
     actions: list[dict]
+    voting_results_opened_at: datetime | None
     transcript: str | None
     ai_suggestions: dict | None
     created_at: datetime

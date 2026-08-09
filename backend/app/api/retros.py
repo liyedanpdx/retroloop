@@ -15,7 +15,7 @@ from app.services.access import (
 from app.models.project import Project
 from app.services.discussion import create_topics, owner_state, topic_to_dict
 from app.services.realtime import broadcast
-from app.services.votes import load_project_for_retro
+from app.services.votes import load_project_for_retro, open_results
 
 router = APIRouter(prefix="/api", tags=["retros"])
 
@@ -53,6 +53,7 @@ def _to_response(retro: Retrospective, project: Project, is_facilitator: bool = 
         # bytes on a payload every member can fetch would have made that a
         # gesture rather than a boundary — the argument #6 already made when it
         # stripped ballots out of this same response for #8.
+        voting_results_opened_at=retro.voting_results_opened_at,
         transcript=retro.transcript if is_facilitator else None,
         ai_suggestions=retro.ai_suggestions if is_facilitator else None,
         created_at=retro.created_at,
@@ -119,6 +120,10 @@ async def update_phase(
     await require_cycle_open(retro)
 
     closes_voting = retro.phase == VOTE and allowed == DISCUSS
+    if closes_voting:
+        # The other route to visible results (#21), stamped in the same write
+        # that changes the phase.
+        open_results(retro, await load_project_for_retro(retro))
     retro.phase = allowed
     # Entering `discuss` is what closes voting, so it is also what turns the
     # tally into an agenda (#9). In-process, not over HTTP — a handler cannot

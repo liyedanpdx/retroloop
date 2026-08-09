@@ -133,6 +133,10 @@ class Retrospective(Document):
     topics: list[Topic] = Field(default_factory=list)
     decisions: list[Decision] = Field(default_factory=list)
     actions: list[Action] = Field(default_factory=list)
+    # When the tally first became visible to anybody (#21). Set once, never
+    # cleared and never moved: results visibility is monotonic, so a later
+    # membership change cannot re-hide them or re-open withdrawal.
+    voting_results_opened_at: datetime | None = None
     transcript: str | None = None
     ai_suggestions: dict | None = None
     created_at: datetime = Field(default_factory=_now)
