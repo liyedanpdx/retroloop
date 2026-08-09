@@ -17,6 +17,26 @@ async def test_register_success(client):
 
 
 @pytest.mark.asyncio
+async def test_register_password_over_72_bytes_is_a_422_not_a_500(client):
+    # bcrypt raises rather than truncating past 72 bytes (#37); this has to
+    # be rejected before hash_password ever sees it.
+    resp = await client.post(
+        "/api/auth/register",
+        json={"email": "toolong@example.com", "password": "x" * 73, "display_name": "Too Long"},
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_register_password_at_72_bytes_succeeds(client):
+    resp = await client.post(
+        "/api/auth/register",
+        json={"email": "exactly72@example.com", "password": "x" * 72, "display_name": "Exactly 72"},
+    )
+    assert resp.status_code == 201
+
+
+@pytest.mark.asyncio
 async def test_register_duplicate_email(client, registered_user):
     resp = await client.post(
         "/api/auth/register",

@@ -80,6 +80,33 @@ tried on yet — the 612-test backend suite referenced below has never actually
 been run outside of review. Treat a green Docker deploy as covering less than
 it looks like it covers until someone builds that env and runs it for real.
 
+Building that env surfaced two more things:
+
+- `backend/app/config.py`'s `Settings` reads `.env` directly (`model_config =
+  {"env_file": ".env"}`), which is relative to the process's cwd, not the repo
+  root — running `pytest` from `backend/` needs its own `backend/.env` (copy
+  the root one; it is gitignored at every depth already). Without it,
+  `MONGO_URL` silently falls back to `mongodb://localhost:27017` and every
+  DB-touching test hangs until connection timeout instead of failing fast.
+  Also, `Settings` had no `extra: "ignore"`, so a `.env` carrying the
+  documented-but-not-a-setting `BACKEND_PORT`/`FRONTEND_PORT` keys (see
+  `.env.example`) crashed `Settings()` outright when loaded this way — Docker
+  never hit this because `env_file:` in Compose only ever populates specific
+  process env vars, and pydantic-settings' env-var source looks up fields by
+  name rather than validating everything present. Fixed by adding
+  `"extra": "ignore"`.
+- Running the full suite (or even one file to the end) against the real
+  external Mongo hangs partway through — individual files and even individual
+  parametrized cases pass in isolation in seconds, but a couple dozen
+  DB-touching tests run back to back in one process stalls indefinitely.
+  `tests/conftest.py`'s `init_test_db` fixture opens a fresh
+  `AsyncIOMotorClient` per test and closes it in teardown, which is correct
+  but means dozens of rapid real connect/close cycles against one external
+  Mongo box — a self-hosted one over LAN, not an idealized local one. Not
+  chased further this round; whatever automation runs this suite should wrap
+  it in a hard timeout and treat a timeout as inconclusive (no deploy, flag
+  it) rather than let it hang.
+
 **Backend would not import: `email-validator is not installed`.** `User`
 (`backend/app/models/user.py`) uses `pydantic.EmailStr`, which pydantic only
 supports with `email-validator` installed — it was never added to

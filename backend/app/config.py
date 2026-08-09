@@ -27,7 +27,10 @@ class Settings(BaseSettings):
     # that is sent both refuses the response outright.
     frontend_origin: str = "http://localhost:3000"
 
-    model_config = {"env_file": ".env"}
+    # Non-secret Compose-only overrides (BACKEND_PORT, FRONTEND_PORT) live in
+    # the same .env file this reads directly outside Docker; they are not
+    # settings this app has, so extra keys here must not be an error.
+    model_config = {"env_file": ".env", "extra": "ignore"}
 
 
 settings = Settings()
