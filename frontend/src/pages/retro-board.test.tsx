@@ -61,6 +61,7 @@ function retro(overrides: Record<string, unknown> = {}) {
     topics: [],
     decisions: [],
     actions: [],
+    voting_results_opened_at: null,
     transcript: null,
     ai_suggestions: null,
     created_at: "2026-02-01T00:00:00Z",
@@ -916,3 +917,119 @@ function renderWithUnmount(routes: Record<string, Handler | Reply>) {
     </MemoryRouter>
   );
 }
+
+// --- withdrawing a ballot (#21) ----------------------------------------------
+
+describe("withdrawing a ballot", () => {
+  const voted = (overrides: Record<string, unknown> = {}) =>
+    board({
+      "GET /api/retros/r1": {
+        status: 200,
+        data: retro({
+          phase: "vote",
+          clusters: [CLUSTER],
+          votes: [{ user_id: ALICE.id, submitted_at: "2026-02-04T00:00:00Z" }],
+          ...overrides,
+        }),
+      },
+      "GET /api/retros/r1/votes/results": { status: 409 },
+      "DELETE /api/retros/r1/votes": { status: 204 },
+    });
+
+  it("is offered while the tally has never been visible", async () => {
+    renderBoard(voted());
+    await ready();
+    expect(screen.getByRole("button", { name: "Withdraw my ballot" })).toBeInTheDocument();
+  });
+
+  it("is gone once the results have opened", async () => {
+    renderBoard(voted({ voting_results_opened_at: "2026-02-05T00:00:00Z" }));
+    await ready();
+    expect(
+      screen.queryByRole("button", { name: "Withdraw my ballot" })
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Vote submitted")).toBeInTheDocument();
+  });
+
+  it("is not offered to somebody who has not voted", async () => {
+    renderBoard(
+      board({
+        "GET /api/retros/r1": {
+          status: 200,
+          data: retro({ phase: "vote", clusters: [CLUSTER] }),
+        },
+        "GET /api/retros/r1/votes/results": { status: 409 },
+      })
+    );
+    await ready();
+    expect(
+      screen.queryByRole("button", { name: "Withdraw my ballot" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("confirms first, saying the whole ballot goes", async () => {
+    const calls = renderBoard(voted());
+    await ready();
+
+    fireEvent.click(screen.getByRole("button", { name: "Withdraw my ballot" }));
+    const dialog = await screen.findByRole("dialog", { name: "Withdraw my ballot" });
+    expect(within(dialog).getByText(/no way to change just/)).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(calls.filter((call) => call.method === "DELETE")).toHaveLength(0);
+  });
+
+  it("withdraws and gives the draft controls back", async () => {
+    let votes: unknown[] = [{ user_id: ALICE.id, submitted_at: "2026-02-04T00:00:00Z" }];
+    const calls = renderBoard(
+      board({
+        "GET /api/retros/r1": () => ({
+          status: 200,
+          data: retro({ phase: "vote", clusters: [CLUSTER], votes }),
+        }),
+        "GET /api/retros/r1/votes/results": { status: 409 },
+        "DELETE /api/retros/r1/votes": () => {
+          votes = [];
+          return { status: 204 };
+        },
+      })
+    );
+    await ready();
+
+    fireEvent.click(screen.getByRole("button", { name: "Withdraw my ballot" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Yes, withdraw it" }));
+
+    expect(await screen.findByRole("button", { name: "Vote for Flow" })).toBeInTheDocument();
+    expect(callsTo(calls, "DELETE", "/api/retros/r1/votes")).toHaveLength(1);
+    expect(screen.queryByText("Vote submitted")).not.toBeInTheDocument();
+  });
+
+  it("refetches and keeps the ballot when the server refuses", async () => {
+    const calls = renderBoard(
+      board({
+        "GET /api/retros/r1": {
+          status: 200,
+          data: retro({
+            phase: "vote",
+            clusters: [CLUSTER],
+            votes: [{ user_id: ALICE.id, submitted_at: "2026-02-04T00:00:00Z" }],
+          }),
+        },
+        "GET /api/retros/r1/votes/results": { status: 409 },
+        "DELETE /api/retros/r1/votes": { status: 409 },
+      })
+    );
+    await ready();
+    const before = callsTo(calls, "GET", "/api/retros/r1").length;
+
+    fireEvent.click(screen.getByRole("button", { name: "Withdraw my ballot" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Yes, withdraw it" }));
+
+    expect(await screen.findByText("You have already voted")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(callsTo(calls, "GET", "/api/retros/r1").length).toBeGreaterThan(before)
+    );
+    expect(screen.getByText("Vote submitted")).toBeInTheDocument();
+  });
+});

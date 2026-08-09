@@ -227,6 +227,7 @@ export function RetroBoardPage() {
           retroId={retro.id}
           clusters={retro.clusters}
           hasVoted={hasVoted}
+          canRetract={!retro.voting_results_opened_at && results === null}
           results={results}
           onSubmitted={load}
           onConflict={load}

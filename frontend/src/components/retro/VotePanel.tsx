@@ -1,6 +1,12 @@
 import { useState } from "react";
 
-import { MAX_VOTES, submitVotes, type Cluster, type VoteResults } from "../../api/retro";
+import {
+  MAX_VOTES,
+  retractBallot,
+  submitVotes,
+  type Cluster,
+  type VoteResults,
+} from "../../api/retro";
 import { describe } from "./ClusterPanel";
 
 /**
@@ -18,6 +24,7 @@ export function VotePanel({
   retroId,
   clusters,
   hasVoted,
+  canRetract,
   results,
   onSubmitted,
   onConflict,
@@ -25,6 +32,8 @@ export function VotePanel({
   retroId: string;
   clusters: Cluster[];
   hasVoted: boolean;
+  /** Results have never been visible, so the ballot can still be taken back. */
+  canRetract: boolean;
   results: VoteResults | null;
   onSubmitted: () => Promise<void>;
   onConflict: () => Promise<void>;
@@ -32,6 +41,7 @@ export function VotePanel({
   const [ballot, setBallot] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   const spent = ballot.length;
   const locked = hasVoted;
@@ -86,7 +96,55 @@ export function VotePanel({
       {error && <p role="alert">{error}</p>}
 
       {locked ? (
-        <p role="status">Vote submitted</p>
+        <>
+          <p role="status">Vote submitted</p>
+          {/* Only your own, only while nobody could have seen the tally. There
+              is no control here that withdraws somebody else's (#21). */}
+          {canRetract && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => setConfirming(true)}
+              className="underline disabled:opacity-50"
+            >
+              Withdraw my ballot
+            </button>
+          )}
+          {confirming && (
+            <div role="dialog" aria-modal="true" aria-label="Withdraw my ballot">
+              <p>
+                Withdraw your whole ballot? All of your votes are removed and you
+                will need to submit a new one — there is no way to change just
+                part of it.
+              </p>
+              <button
+                type="button"
+                className="underline"
+                onClick={() => {
+                  setConfirming(false);
+                  setPending(true);
+                  setError(null);
+                  retractBallot(retroId)
+                    .then(() => onSubmitted())
+                    .catch(async (failure) => {
+                      setError(describe(failure));
+                      await onConflict();
+                    })
+                    .finally(() => setPending(false));
+                }}
+              >
+                Yes, withdraw it
+              </button>
+              <button
+                type="button"
+                className="ml-3 underline"
+                onClick={() => setConfirming(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </>
       ) : (
         <>
           <p role="status">

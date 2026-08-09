@@ -172,6 +172,7 @@ const RETRO = {
   ],
   decisions: [],
   actions: [],
+  voting_results_opened_at: null,
   transcript: null,
   ai_suggestions: null,
   created_at: "2026-02-01T00:00:00Z",

@@ -55,6 +55,8 @@ export type Retro = {
   topics: Topic[];
   decisions: Decision[];
   actions: Action[];
+  /** When the tally first became visible; null while it is still hidden (#21). */
+  voting_results_opened_at: string | null;
   transcript: string | null;
   ai_suggestions: unknown;
   created_at: string;
@@ -109,6 +111,11 @@ export async function suggestClusters(retroId: string): Promise<SuggestedGroupin
 /** One atomic ballot, repetitions preserved — stacked votes are repeated ids. */
 export async function submitVotes(retroId: string, clusterIds: string[]): Promise<void> {
   await api.post(`/api/retros/${retroId}/votes`, { cluster_ids: clusterIds });
+}
+
+/** Withdraw the caller's whole ballot. There is no partial version (#21). */
+export async function retractBallot(retroId: string): Promise<void> {
+  await api.delete(`/api/retros/${retroId}/votes`);
 }
 
 export async function getResults(retroId: string): Promise<VoteResults> {
