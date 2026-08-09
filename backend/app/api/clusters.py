@@ -15,6 +15,7 @@ from app.schemas.cluster import (
     SuggestClustersRequest,
 )
 from app.schemas.feedback import FeedbackResponse
+from app.services.concurrency import save_retro
 from app.services.access import (
     get_cycle_for_member,
     get_retro_for_facilitator,
@@ -58,7 +59,7 @@ async def create_cluster(
 
     cluster = Cluster(id=str(uuid4()), name=body.name)
     retro.clusters.append(cluster)
-    await retro.save()
+    await save_retro(retro)
 
     response = _to_response(cluster)
     await broadcast(str(retro.id), "cluster_created", response.model_dump(mode="json"))
@@ -114,7 +115,7 @@ async def rename_cluster(
 
     cluster = _find_cluster(retro, cluster_id)
     cluster.name = body.name
-    await retro.save()
+    await save_retro(retro)
 
     response = _to_response(cluster)
     await broadcast(str(retro.id), "cluster_renamed", response.model_dump(mode="json"))
@@ -129,7 +130,7 @@ async def delete_cluster(
     _find_cluster(retro, cluster_id)
 
     retro.clusters = [c for c in retro.clusters if c.id != cluster_id]
-    await retro.save()
+    await save_retro(retro)
 
     # The cards outlive the cluster, so they are ungrouped rather than deleted.
     orphans = await FeedbackCard.find(

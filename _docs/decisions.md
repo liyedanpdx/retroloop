@@ -271,8 +271,41 @@ the `done` phase.
 
 ### The guard is a request-time check, not a transaction (issue #20)
 It refuses every request that observes an already-closed cycle. A mutation that
-passed the guard before a concurrent close committed is #34's, and is
-deliberately not claimed here.
+passed the guard before a concurrent close committed is #34's, below.
+
+### Conditional writes, because this MongoDB is a standalone (issue #34)
+Checked rather than assumed: `hello` on the configured server returns
+`setName: None`, so it is a standalone and **multi-document transactions are not
+available**. The strategy is therefore the other one — put the authority for
+"may this still be written?" inside the retro document, so every write's
+condition and its data are in the same document, where a single-document update
+is atomic.
+
+`Retrospective.writes_closed_at` is that authority. `save_retro()` in
+`app/services/concurrency.py` replaces every `retro.save()` with a conditional
+replace on it still being null, and answers a lost condition with #20's own
+`400` and detail — losing the race and being refused by the sequential guard are
+the same event to a caller.
+
+`close_retro_writes()` is the only thing that sets it, in one atomic update, so
+two concurrent closes produce one winner. Both closing paths call it **before**
+touching the cycle: closing the cycle first would let a mutation that had
+already passed #20's guard commit afterwards, which is exactly the hole this
+issue exists to fill. Publish additionally makes `phase: discuss` part of the
+same condition and sets `phase: done` in the same write, so "only from discuss"
+and "only once" stop being a read followed by a write.
+
+Two things this does **not** claim. Mutations still race each other with
+last-write-wins on the retro document; #34 is about close-versus-write, and a
+version field for write-versus-write would be its own issue. And the two-document
+publish is still two writes — the retro is closed first and rolled back if the
+cycle write fails, which is as close to atomic as a standalone allows.
+
+The close also terminates an in-flight extraction in the same update, marking a
+`processing` suggestion document `failed`. Its terminal write is about to lose
+the same condition, and without this the status would sit at `processing`
+forever while #17's poller spins — the "no falsely active job" the issue asks
+for.
 
 ## Summary
 

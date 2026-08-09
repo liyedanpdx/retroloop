@@ -6,6 +6,7 @@ from app.models.cycle import CLOSED, RETRO
 from app.models.retro import DISCUSS, VOTE, Retrospective, next_phase
 from app.models.user import User
 from app.schemas.retro import RetroResponse, UpdatePhaseRequest
+from app.services.concurrency import save_retro
 from app.services.access import (
     get_cycle_for_facilitator,
     get_retro_for_facilitator,
@@ -130,7 +131,7 @@ async def update_phase(
     # call its own API, which is why `tally()` lives in a service at all.
     if allowed == DISCUSS:
         create_topics(retro)
-    await retro.save()
+    await save_retro(retro)
 
     # After the save, never before (#12). `voting_closed` goes first because it
     # explains the transition that `phase_changed` then announces — a client

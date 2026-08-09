@@ -31,6 +31,7 @@ from app.schemas.transcript import (
     TranscriptAcceptedResponse,
     TranscriptRequest,
 )
+from app.services.concurrency import save_retro
 from app.services.access import get_retro_for_facilitator, require_cycle_open, require_phase
 from app.services.transcript import (
     PROCESSING,
@@ -93,7 +94,7 @@ async def paste_transcript(
 
     retro.transcript = body.text
     retro.ai_suggestions = processing_document()
-    await retro.save()
+    await save_retro(retro)
 
     background_tasks.add_task(run_extraction, retro.id)
     return TranscriptAcceptedResponse(status=PROCESSING)
@@ -144,7 +145,7 @@ async def delete_transcript(retro_id: str, user: User = Depends(get_current_user
 
     retro.transcript = None
     retro.ai_suggestions = None
-    await retro.save()
+    await save_retro(retro)
 
 
 @router.post("/retros/{retro_id}/suggestions/confirm", response_model=ConfirmResponse)
@@ -159,5 +160,5 @@ async def confirm(
     """
     retro = await _writable_retro(retro_id, user)
     result = await confirm_suggestions(retro, body)
-    await retro.save()
+    await save_retro(retro)
     return ConfirmResponse(**result)

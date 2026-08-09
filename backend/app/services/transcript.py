@@ -37,6 +37,7 @@ from app.models.retro import (
     Retrospective,
 )
 from app.models.user import User
+from app.services.concurrency import save_retro
 from app.services.ai import ProxyError, ProxyMalformedResponse, chat_json
 from app.services.votes import load_project_for_retro
 
@@ -281,7 +282,13 @@ async def _store_result(retro_id, error: str | None, decisions, actions) -> None
         DECISIONS: decisions,
         ACTIONS: actions,
     }
-    await retro.save()
+    try:
+        await save_retro(retro)
+    except HTTPException:
+        # 这个 retro 在抽取跑的时候被关掉了 (#34)。终态写输掉了条件,而这里
+        # 没有任何请求可以把这个 400 交给谁——它是一个后台任务。关闭那一步
+        # 已经把在途的抽取标成 failed 了,所以状态不会停在 `processing`。
+        return
 
 
 # --- confirming --------------------------------------------------------------

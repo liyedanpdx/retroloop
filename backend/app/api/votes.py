@@ -11,6 +11,7 @@ from app.schemas.vote import (
     VoteResultsResponse,
 )
 from app.services import votes as vote_service
+from app.services.concurrency import save_retro
 from app.services.access import get_retro_for_member, require_writable_phase
 from app.services.realtime import broadcast
 
@@ -97,7 +98,7 @@ async def submit_votes(
     opened = vote_service.everyone_has_voted(retro, project) and vote_service.open_results(
         retro, project
     )
-    await retro.save()
+    await save_retro(retro)
 
     # Who voted, never what they chose (#29). The room needs the participation
     # count to move; handing it the ids would undo #8 in one line.

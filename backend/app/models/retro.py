@@ -136,6 +136,10 @@ class Retrospective(Document):
     # When the tally first became visible to anybody (#21). Set once, never
     # cleared and never moved: results visibility is monotonic, so a later
     # membership change cannot re-hide them or re-open withdrawal.
+    # 这个 retro 是否还接受写入 (#34)。权威放在 retro 自己身上,不是 cycle 上:
+    # MongoDB 是单机,没有多文档事务,所以「检查」和「写入」必须落在同一个
+    # 文档上才可能原子。关闭 cycle 的操作先原子地封这里,再去动 cycle。
+    writes_closed_at: datetime | None = None
     voting_results_opened_at: datetime | None = None
     transcript: str | None = None
     ai_suggestions: dict | None = None

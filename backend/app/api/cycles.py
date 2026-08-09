@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.deps import get_current_user
 from app.models.cycle import ACTIVE_STATUSES, CLOSED, COLLECTING, Cycle
+from app.models.retro import Retrospective
+from app.services.concurrency import close_retro_writes, reopen_retro_writes
 from app.models.user import User
 from app.schemas.cycle import CycleResponse, UpdateCycleRequest
 from app.services.access import (
@@ -85,7 +87,18 @@ async def update_cycle(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Cycle is already closed"
         )
 
+    # 关 cycle 之前先封它的 retro (#34)。顺序是这样而不是反过来:先封,
+    # 任何还没提交的 retro 写从这一刻起就输了;先关 cycle 的话,那些写会在
+    # cycle 已经关闭之后才落库,而它们通过 #20 守卫的时候 cycle 还开着。
+    retro = await Retrospective.find_one(Retrospective.cycle_id == cycle.id)
+    closed_retro = retro is not None and await close_retro_writes(retro)
+
     cycle.status = CLOSED
     cycle.closed_at = datetime.now(timezone.utc)
-    await cycle.save()
+    try:
+        await cycle.save()
+    except BaseException:
+        if closed_retro:
+            await reopen_retro_writes(retro)
+        raise
     return _to_response(cycle)
