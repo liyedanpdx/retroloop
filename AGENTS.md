@@ -3,6 +3,7 @@
 ## Documents
 
 - `_docs/process.md` - how work is organized
+- `_docs/deployment.md` - bringing the stack up on a machine, and what "it came up" does not prove
 
 ## Commands
 
