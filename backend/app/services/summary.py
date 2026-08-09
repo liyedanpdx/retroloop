@@ -10,6 +10,7 @@ from app.schemas.summary import (
     SummaryResponse,
     SummaryTopic,
 )
+from app.services.access import load_cycle
 from app.services.discussion import topic_name
 from app.services.votes import members_voted
 
@@ -33,11 +34,11 @@ async def assemble_summary(retro: Retrospective, project: Project) -> SummaryRes
     cards = await FeedbackCard.find(FeedbackCard.cycle_id == retro.cycle_id).sort(
         "+created_at", "+_id"
     ).to_list()
-    submitters = {
-        card.author_id
-        for card in cards
-        if card.author_id is not None and card.author_id in current_member_ids
-    }
+    # The cycle's participation marker (#28), not the cards: a member whose
+    # cards were all anonymous has no author reference to count, and counting
+    # cards would have understated them.
+    cycle = await load_cycle(str(retro.cycle_id))
+    submitters = set(cycle.participants) & current_member_ids
 
     return SummaryResponse(
         topics=[

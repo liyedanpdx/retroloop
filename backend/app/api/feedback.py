@@ -80,6 +80,14 @@ async def create_card(
         is_anonymous=body.is_anonymous,
     )
     await card.insert()
+
+    # Participation is recorded once per member per cycle (#28). It is written
+    # after the card so a failed insert cannot mark somebody as having
+    # submitted something that does not exist.
+    if user.id not in cycle.participants:
+        cycle.participants.append(user.id)
+        await cycle.save()
+
     return card_to_response(card)
 
 

@@ -70,6 +70,24 @@ hidden field is that same access wearing a different name.
 Consequence for the frontend (#15): the anonymous checkbox is a commitment. The
 UI should say so before the card is created, because there is no undo.
 
+### Participation is a marker on the cycle, not on the card (issue #28)
+`Cycle.participants` holds one user id per member who submitted anything in that
+cycle, anonymous or not. `submitted_feedback` is that list intersected with the
+current member list, which is why a departed member can never push the count
+above `total_members`.
+
+It lives on the cycle rather than the card deliberately: a marker on an
+anonymous card would be the author reference #5 erased, wearing a different
+name. Nothing on the marker can be joined to a card — no card id, no category,
+no text, no timestamp — and no endpoint returns it.
+
+Two limits worth stating rather than discovering. In a cycle with exactly one
+card, "this member participated" and "this member wrote that card" coincide;
+that is the unavoidable cost of an exact count, and it is the same inference
+the count alone would allow in a one-member project. And the marker is not
+removed when a member deletes their cards, because an anonymous card carries
+nothing to recount from — it records that they took part, which remains true.
+
 ### Cards freeze at reveal (issue #6)
 Once the cycle leaves `collecting`, feedback cards are read-only: `PATCH` and
 `DELETE /api/feedback/{id}` return 400. Creation is already blocked at that point.

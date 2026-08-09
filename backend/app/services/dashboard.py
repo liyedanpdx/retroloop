@@ -11,7 +11,6 @@ requests and make #14 flicker.
 """
 
 from app.models.cycle import ACTIVE_STATUSES, Cycle
-from app.models.feedback import FeedbackCard
 from app.models.project import Project
 from app.models.retro import Retrospective
 from app.models.user import User
@@ -51,13 +50,14 @@ async def _members(project: Project) -> list[DashboardMember]:
 
 
 async def _progress(cycle: Cycle, project: Project) -> SubmissionProgress:
-    cards = await FeedbackCard.find(FeedbackCard.cycle_id == cycle.id).to_list()
+    """From the cycle's participation marker (#28), not from card authorship.
+
+    Intersecting with the current member list is what keeps the count from
+    exceeding `total_members` after somebody leaves — a departed member's
+    marker stays on the cycle, and is simply not counted.
+    """
     current = {member.user_id for member in project.members}
-    submitters = {
-        card.author_id
-        for card in cards
-        if card.author_id is not None and card.author_id in current
-    }
+    submitters = set(cycle.participants) & current
     return SubmissionProgress(
         submitted_members=len(submitters), total_members=len(project.members)
     )
