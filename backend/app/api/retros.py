@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.api.votes import vote_results
 from app.deps import get_current_user
 from app.models.cycle import CLOSED, RETRO
-from app.models.retro import DISCUSS, Retrospective, next_phase
+from app.models.retro import DISCUSS, VOTE, Retrospective, next_phase
 from app.models.user import User
 from app.schemas.retro import RetroResponse, UpdatePhaseRequest
 from app.services.access import (
@@ -11,6 +12,8 @@ from app.services.access import (
     get_retro_for_member,
 )
 from app.services.discussion import create_topics, topic_to_dict
+from app.services.realtime import broadcast
+from app.services.votes import load_project_for_retro
 
 router = APIRouter(prefix="/api", tags=["retros"])
 
@@ -92,6 +95,7 @@ async def update_phase(
             detail=f"Phase moves one step at a time; {retro.phase} can only become {allowed}",
         )
 
+    closes_voting = retro.phase == VOTE and allowed == DISCUSS
     retro.phase = allowed
     # Entering `discuss` is what closes voting, so it is also what turns the
     # tally into an agenda (#9). In-process, not over HTTP — a handler cannot
@@ -99,4 +103,15 @@ async def update_phase(
     if allowed == DISCUSS:
         create_topics(retro)
     await retro.save()
+
+    # After the save, never before (#12). `voting_closed` goes first because it
+    # explains the transition that `phase_changed` then announces — a client
+    # that saw them the other way round would render the discuss phase for a
+    # moment with no results behind it.
+    room = str(retro.id)
+    if closes_voting:
+        project = await load_project_for_retro(retro)
+        await broadcast(room, "voting_closed", vote_results(retro, project).model_dump(mode="json"))
+    await broadcast(room, "phase_changed", {"phase": allowed})
+
     return _to_response(retro)

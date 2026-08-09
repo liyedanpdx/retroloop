@@ -43,6 +43,7 @@ from app.schemas.discussion import (
 )
 from app.services.access import get_retro_for_facilitator, get_retro_for_member, require_phase
 from app.services.discussion import topic_name
+from app.services.realtime import broadcast
 from app.services.votes import load_project_for_retro
 
 router = APIRouter(prefix="/api", tags=["discussion"])
@@ -169,13 +170,21 @@ async def update_topic(
     topic = _find_topic(retro, topic_id)
 
     sent = body.model_fields_set
+    before = (topic.status, topic.notes)
     if "status" in sent and body.status is not None:
         topic.status = body.status
     if "notes" in sent and body.notes is not None:
         topic.notes = body.notes
 
     await retro.save()
-    return _topic_response(retro, topic)
+
+    response = _topic_response(retro, topic)
+    # An empty body and a body repeating the stored values are both no-ops, and
+    # a no-op is not an event (#12). Comparing the values rather than trusting
+    # `model_fields_set` is what makes the second case quiet too.
+    if (topic.status, topic.notes) != before:
+        await broadcast(str(retro.id), "topic_updated", response.model_dump(mode="json"))
+    return response
 
 
 # --- decisions ---------------------------------------------------------------

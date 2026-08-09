@@ -15,6 +15,7 @@ from app.services.access import (
     parse_object_id,
     require_phase,
 )
+from app.services.realtime import broadcast
 
 router = APIRouter(prefix="/api", tags=["clusters"])
 
@@ -49,7 +50,10 @@ async def create_cluster(
     cluster = Cluster(id=str(uuid4()), name=body.name)
     retro.clusters.append(cluster)
     await retro.save()
-    return _to_response(cluster)
+
+    response = _to_response(cluster)
+    await broadcast(str(retro.id), "cluster_created", response.model_dump(mode="json"))
+    return response
 
 
 @router.patch("/retros/{retro_id}/clusters/{cluster_id}", response_model=ClusterResponse)
@@ -64,7 +68,10 @@ async def rename_cluster(
     cluster = _find_cluster(retro, cluster_id)
     cluster.name = body.name
     await retro.save()
-    return _to_response(cluster)
+
+    response = _to_response(cluster)
+    await broadcast(str(retro.id), "cluster_renamed", response.model_dump(mode="json"))
+    return response
 
 
 @router.delete("/retros/{retro_id}/clusters/{cluster_id}", response_model=list[ClusterResponse])
@@ -85,6 +92,14 @@ async def delete_cluster(
         card.cluster_id = None
         await card.save()
 
+    # The card ids travel with the event because the delete moved them too. A
+    # client told only that a cluster is gone would have to guess which cards
+    # came loose, or refetch the whole board to find out.
+    await broadcast(
+        str(retro.id),
+        "cluster_deleted",
+        {"id": cluster_id, "card_ids": [str(card.id) for card in orphans]},
+    )
     return [_to_response(c) for c in retro.clusters]
 
 
@@ -114,6 +129,18 @@ async def move_card(
     if body.cluster_id is not None:
         _find_cluster(retro, body.cluster_id)
 
+    # Dropping a card back where it already was is a legal request and a 200,
+    # but it is not news. Broadcasting it would make every client re-render a
+    # move that never happened, and during clustering that is a card visibly
+    # jumping under someone else's cursor.
+    moved = card.cluster_id != body.cluster_id
     card.cluster_id = body.cluster_id
     await card.save()
+
+    if moved:
+        await broadcast(
+            str(retro.id),
+            "card_moved",
+            {"card_id": str(card.id), "cluster_id": card.cluster_id},
+        )
     return card_to_response(card)

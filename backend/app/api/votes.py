@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.deps import get_current_user
+from app.models.project import Project
 from app.models.retro import VOTE, Retrospective, Vote
 from app.models.user import User
 from app.schemas.vote import (
@@ -20,6 +21,31 @@ def _to_response(ballot: Vote) -> VoteResponse:
         user_id=str(ballot.user_id),
         cluster_ids=list(ballot.cluster_ids),
         submitted_at=ballot.submitted_at,
+    )
+
+
+def vote_results(retro: Retrospective, project: Project) -> VoteResultsResponse:
+    """The tally as a member is allowed to see it, results-visibility aside.
+
+    Shared rather than inlined in the GET below, because #12 broadcasts
+    `voting_closed` with this exact payload when the facilitator leaves the vote
+    phase. Two constructions of the same shape would drift the moment one gained
+    a field, and a client would be reading a different tally over the socket
+    than over HTTP.
+    """
+    return VoteResultsResponse(
+        members_voted=vote_service.members_voted(retro, project),
+        members_total=len(project.members),
+        total_votes=vote_service.total_votes(retro),
+        results=[
+            VoteResultRow(
+                cluster_id=row.cluster_id,
+                name=row.name,
+                vote_count=row.vote_count,
+                rank=row.rank,
+            )
+            for row in vote_service.tally(retro)
+        ],
     )
 
 
@@ -84,17 +110,4 @@ async def get_vote_results(retro_id: str, user: User = Depends(get_current_user)
             detail="Results are hidden until voting closes",
         )
 
-    return VoteResultsResponse(
-        members_voted=vote_service.members_voted(retro, project),
-        members_total=len(project.members),
-        total_votes=vote_service.total_votes(retro),
-        results=[
-            VoteResultRow(
-                cluster_id=row.cluster_id,
-                name=row.name,
-                vote_count=row.vote_count,
-                rank=row.rank,
-            )
-            for row in vote_service.tally(retro)
-        ],
-    )
+    return vote_results(retro, project)

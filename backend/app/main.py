@@ -12,6 +12,7 @@ from app.api.summary import router as summary_router
 from app.api.retros import router as retros_router
 from app.api.transcript import router as transcript_router
 from app.api.votes import router as votes_router
+from app.api.ws import router as ws_router
 from app.database import init_db
 
 
@@ -32,6 +33,7 @@ app.include_router(votes_router)
 app.include_router(discussion_router)
 app.include_router(transcript_router)
 app.include_router(summary_router)
+app.include_router(ws_router)
 
 
 @app.get("/api/health")
