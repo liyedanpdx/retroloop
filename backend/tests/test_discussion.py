@@ -675,7 +675,10 @@ async def test_facilitator_creates_an_action(
     assert data["owner_id"] == registered_user["id"]
     assert data["due_date"] is None
     assert data["topic_id"] == topic["id"]
-    assert "owner_name" not in data, "owner_name belongs to #10 and is never returned here"
+    assert data["owner_name"] is None, (
+        "#10 adds owner_name to every action response; #9 never writes it, so it is "
+        "present and null rather than absent"
+    )
 
     stored = (await _stored(retro["id"])).actions[0]
     assert stored.owner_name is None, "and never written"

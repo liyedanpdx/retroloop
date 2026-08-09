@@ -108,12 +108,20 @@ class DecisionResponse(BaseModel):
 
 
 class ActionResponse(BaseModel):
-    """No `owner_name` — that field is #10's and #9 never writes or returns it."""
+    """`owner_name` is #10's field, but it is always present here.
+
+    #9 never writes it, so on an ordinary action it serialises as null. It is
+    still emitted, because the shape of an action must not depend on the value
+    of one of its fields: `GET /api/retros/{id}` has always shown `owner_name`,
+    and a facilitator who `POST`s or `PATCH`es an action has to get back the
+    same keys for the same object. Excluding the key when it is null was the
+    defect #10 exists to remove — it made the response shape vary per action.
+    """
 
     id: str
     topic_id: str | None
     description: str
     owner_id: str | None
-    owner_name: str | None = Field(default=None, exclude_if=lambda value: value is None)
+    owner_name: str | None = None
     status: str
     due_date: datetime | None
