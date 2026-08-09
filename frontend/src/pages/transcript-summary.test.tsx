@@ -274,7 +274,8 @@ describe("pasting", () => {
     fireEvent.click(screen.getByRole("button", { name: "Extract" }));
 
     expect(await screen.findByText(/used its AI requests for now/)).toBeInTheDocument();
-    expect(box).toHaveValue("we agreed", "文本还在,等会儿再试就行");
+    // 文本还在,等会儿再试就行。
+    expect(box).toHaveValue("we agreed");
   });
 
   it("treats a 409 as already running rather than a failure", async () => {
