@@ -142,6 +142,23 @@ transcript text. Audio/video can be a separate post-MVP issue.
 AI-extracted items are never auto-saved as confirmed decisions/actions. The
 facilitator must explicitly confirm each one.
 
+### The transcript and the AI drafts are the facilitator's (issue #26)
+`transcript` and `ai_suggestions` are `null` on `GET /api/retros/{id}` for every
+member who is not the facilitator, matching `GET /api/retros/{id}/suggestions`,
+which #10 made facilitator-only. Nothing else about the payload changes: same
+keys, same values, two fields redacted.
+
+The alternative — leaving them visible, on the grounds that the team sat through
+the meeting — was rejected for the reason #26 itself gives. #10 restricted the
+dedicated endpoint on the reasoning that AI drafts are the facilitator's review
+queue; leaving the same bytes one call away on a payload every member fetches
+would have made that a gesture rather than a boundary. It is the argument #6
+already accepted when it stripped ballots out of this same response for #8.
+
+The transcript is also the most sensitive thing the product stores: a verbatim
+record of who said what, including people who are not on the project. Deleting
+it is #25; this decision is only about who may read it.
+
 ### httpx is the runtime HTTP client (issues #19, #10)
 `httpx` moves from `[project.optional-dependencies] dev` to `[project]
 dependencies` in `backend/pyproject.toml`. This is the dependency approval

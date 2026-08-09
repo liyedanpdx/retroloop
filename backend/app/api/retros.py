@@ -19,7 +19,12 @@ from app.services.votes import load_project_for_retro
 router = APIRouter(prefix="/api", tags=["retros"])
 
 
-def _to_response(retro: Retrospective) -> RetroResponse:
+def _to_response(retro: Retrospective, is_facilitator: bool = True) -> RetroResponse:
+    """The retro as a caller is allowed to see it.
+
+    `is_facilitator` defaults to True because the two facilitator-only handlers
+    below have already proved it; only the member-readable GET passes it.
+    """
     return RetroResponse(
         id=str(retro.id),
         cycle_id=str(retro.cycle_id),
@@ -36,8 +41,13 @@ def _to_response(retro: Retrospective) -> RetroResponse:
         topics=[topic_to_dict(retro, t) for t in retro.topics],
         decisions=[d.model_dump(mode="json") for d in retro.decisions],
         actions=[a.model_dump(mode="json") for a in retro.actions],
-        transcript=retro.transcript,
-        ai_suggestions=retro.ai_suggestions,
+        # Both are the facilitator's, and this is where that has to be true
+        # (#26). #10 made `GET /suggestions` facilitator-only; leaving the same
+        # bytes on a payload every member can fetch would have made that a
+        # gesture rather than a boundary — the argument #6 already made when it
+        # stripped ballots out of this same response for #8.
+        transcript=retro.transcript if is_facilitator else None,
+        ai_suggestions=retro.ai_suggestions if is_facilitator else None,
         created_at=retro.created_at,
     )
 
@@ -75,7 +85,8 @@ async def start_retro(cycle_id: str, user: User = Depends(get_current_user)):
 @router.get("/retros/{retro_id}", response_model=RetroResponse)
 async def get_retro(retro_id: str, user: User = Depends(get_current_user)):
     retro = await get_retro_for_member(retro_id, user)
-    return _to_response(retro)
+    project = await load_project_for_retro(retro)
+    return _to_response(retro, project.is_facilitator(user.id))
 
 
 @router.patch("/retros/{retro_id}/phase", response_model=RetroResponse)
