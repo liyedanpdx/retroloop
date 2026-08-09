@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.deps import get_current_user
 from app.models.project import FACILITATOR, Member, Project
 from app.models.user import User
+from app.schemas.dashboard import DashboardResponse
 from app.schemas.project import (
     AddMemberRequest,
     CreateProjectRequest,
@@ -14,6 +15,7 @@ from app.services.access import (
     get_project_for_member,
     parse_object_id,
 )
+from app.services.dashboard import assemble_dashboard
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -58,6 +60,18 @@ async def list_projects(user: User = Depends(get_current_user)):
 async def get_project(project_id: str, user: User = Depends(get_current_user)):
     project = await get_project_for_member(project_id, user)
     return _to_response(project)
+
+
+@router.get("/{project_id}/dashboard", response_model=DashboardResponse)
+async def get_dashboard(project_id: str, user: User = Depends(get_current_user)):
+    """Everything #14's project page needs, in one authorized read (#31).
+
+    Any current member, not only the facilitator: this is the page a member
+    lands on, and none of it is privileged — the counts are counts, and the
+    actions are the ones the team agreed to in the open.
+    """
+    project = await get_project_for_member(project_id, user)
+    return await assemble_dashboard(project)
 
 
 @router.post(
