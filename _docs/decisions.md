@@ -142,6 +142,26 @@ transcript text. Audio/video can be a separate post-MVP issue.
 AI-extracted items are never auto-saved as confirmed decisions/actions. The
 facilitator must explicitly confirm each one.
 
+### Deleting a transcript is explicit, and works in every state (issue #25)
+`DELETE /api/retros/{id}/transcript`, facilitator-only, `204`. It clears
+`transcript` and `ai_suggestions` together — the drafts are derived from the
+text and outliving it would defeat the point — while confirmed decisions and
+actions stay, because those are the retro's own record in #9's arrays and not
+the transcript's.
+
+Explicit deletion rather than automatic expiry: expiry needs a scheduler this
+stack does not have, and a silent deletion is worse than none if a team is
+relying on it. An expiry policy can be added on top later.
+
+It deliberately does **not** go through #20's writable-phase guard, and works on
+a published retro with a closed cycle. This is retention, not a retrospective
+write, and a retention control that stops working when the retro finishes is
+useless exactly when it is wanted. It is refused only while an extraction is in
+flight, `409`, because that task writes the drafts back in its `finally`.
+
+Deleting twice is `204`, and so is deleting a retro that never had a
+transcript. The caller asked for it to be gone; it is gone.
+
 ### The transcript and the AI drafts are the facilitator's (issue #26)
 `transcript` and `ai_suggestions` are `null` on `GET /api/retros/{id}` for every
 member who is not the facilitator, matching `GET /api/retros/{id}/suggestions`,

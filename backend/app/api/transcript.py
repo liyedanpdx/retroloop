@@ -112,6 +112,41 @@ async def get_suggestions(retro_id: str, user: User = Depends(get_current_user))
     return suggestions_view(retro)
 
 
+@router.delete("/retros/{retro_id}/transcript", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_transcript(retro_id: str, user: User = Depends(get_current_user)):
+    """Remove the stored meeting text, and the drafts derived from it (#25).
+
+    Three deliberate departures from the rules the rest of this module follows.
+
+    *Every phase, and a closed cycle too.* This is a retention control, not a
+    retrospective write. One that stopped working when the retro finished would
+    be useless precisely when it is wanted — a published retro is exactly the
+    case where nobody needs the raw transcript any more. So it does not go
+    through #20's writable-phase guard.
+
+    *Confirmed items survive.* A decision or an action the facilitator kept is
+    the retro's own record and belongs to #9's arrays; only the transcript and
+    the suggestion document go. Deleting the source must not quietly delete what
+    the team agreed.
+
+    *Idempotent.* Deleting a retro that has no transcript is a 204, not a 404.
+    The caller asked for it to be gone, and it is.
+    """
+    retro = await get_retro_for_facilitator(retro_id, user)
+
+    if is_processing(retro):
+        # An extraction in flight would write the drafts straight back in its
+        # `finally`, so the delete has to wait for it to finish.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An extraction is running; wait for it to finish",
+        )
+
+    retro.transcript = None
+    retro.ai_suggestions = None
+    await retro.save()
+
+
 @router.post("/retros/{retro_id}/suggestions/confirm", response_model=ConfirmResponse)
 async def confirm(
     retro_id: str, body: ConfirmRequest, user: User = Depends(get_current_user)
