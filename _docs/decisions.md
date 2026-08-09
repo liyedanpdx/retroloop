@@ -10,6 +10,32 @@ Access token in memory (React ref/state), refresh token in httpOnly cookie.
 localStorage is vulnerable to XSS. Page refresh loses the access token but
 the silent refresh flow recovers it automatically.
 
+### The refresh token is never in a body, either direction (issue #30)
+`POST /api/auth/login` returns only the access token and sets the refresh token
+in an httpOnly cookie named `refresh_token`, scoped to `/api/auth`.
+`POST /api/auth/refresh` reads that cookie; there is no `refresh_token` request
+field and no `TokenResponse` carrying one.
+
+Returning it in the login body and asking the client not to store it would be a
+convention, not a boundary — the XSS that "Token storage" exists to survive can
+read a response body as easily as `localStorage`.
+
+### Logout is unauthenticated (issue #30)
+`POST /api/auth/logout` expires the cookie and returns `204`, with no token
+required and no error on a repeat call. Requiring a valid access token would
+make logging out impossible in the situation it matters most, a session that has
+already gone wrong; and the worst a forged call achieves is expiring a cookie
+the caller already had.
+
+### Cookie flags and the allowed origin are settings (issue #30)
+`COOKIE_SECURE`, `COOKIE_SAMESITE` and `FRONTEND_ORIGIN`, defaulting to the
+development values (`false`, `lax`, `http://localhost:3000`). `Secure` cannot be
+hard-coded on, because a browser drops a `Secure` cookie over plain HTTP and
+localhost could then never log in; it cannot be hard-coded off either. CORS
+names that one origin with `allow_credentials=True` and never `*` — a browser
+rejects a credentialed response carrying a wildcard, so the safe configuration
+is also the only working one.
+
 ### Axios interceptor handles refresh (issue #13)
 When any API call returns 401, the interceptor tries POST /api/auth/refresh
 once. If refresh succeeds, the original request is retried. If refresh fails,

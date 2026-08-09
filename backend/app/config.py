@@ -12,6 +12,16 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-5.4"
     jwt_secret: str = "change-me"
     jwt_refresh_secret: str = "change-me-refresh"
+    # The refresh cookie's deployment-dependent attributes (#30). The defaults
+    # are the development ones: a `Secure` cookie is dropped by the browser over
+    # plain HTTP, so localhost could not log in at all with `secure=True`.
+    # Production sets COOKIE_SECURE=true next to its https origin.
+    cookie_secure: bool = False
+    cookie_samesite: str = "lax"
+    # The single browser origin allowed to send credentialed requests (#30).
+    # Never `*`: a wildcard cannot be combined with credentials, and a browser
+    # that is sent both refuses the response outright.
+    frontend_origin: str = "http://localhost:3000"
 
     model_config = {"env_file": ".env"}
 

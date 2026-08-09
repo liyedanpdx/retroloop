@@ -34,8 +34,8 @@ async def test_login_success(client, registered_user):
     assert resp.status_code == 200
     data = resp.json()
     assert "access_token" in data
-    assert "refresh_token" in data
     assert data["token_type"] == "bearer"
+    assert "refresh_token" not in data, "it is in the cookie now, and only there (#30)"
 
 
 @pytest.mark.asyncio
@@ -62,9 +62,10 @@ async def test_refresh_success(client, registered_user):
         "/api/auth/login",
         json={"email": "alice@example.com", "password": "secret123"},
     )
-    refresh_token = login_resp.json()["refresh_token"]
+    assert login_resp.status_code == 200
 
-    resp = await client.post("/api/auth/refresh", json={"refresh_token": refresh_token})
+    # No token is passed: the client kept the cookie login set, and sends it.
+    resp = await client.post("/api/auth/refresh")
     assert resp.status_code == 200
     data = resp.json()
     assert "access_token" in data
@@ -73,7 +74,8 @@ async def test_refresh_success(client, registered_user):
 
 @pytest.mark.asyncio
 async def test_refresh_invalid_token(client):
-    resp = await client.post("/api/auth/refresh", json={"refresh_token": "garbage"})
+    client.cookies.set("refresh_token", "garbage", path="/api/auth")
+    resp = await client.post("/api/auth/refresh")
     assert resp.status_code == 401
 
 

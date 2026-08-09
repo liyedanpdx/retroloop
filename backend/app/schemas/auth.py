@@ -20,17 +20,14 @@ class LoginRequest(BaseModel):
     password: str
 
 
-class TokenResponse(BaseModel):
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
-
-
-class RefreshRequest(BaseModel):
-    refresh_token: str
-
-
 class AccessTokenResponse(BaseModel):
+    """The only token shape a client ever sees (#30).
+
+    There is no `TokenResponse` carrying a refresh token and no
+    `RefreshRequest` carrying one back: the refresh token travels only in an
+    httpOnly cookie, so neither direction has a body field for it.
+    """
+
     access_token: str
     token_type: str = "bearer"
 
