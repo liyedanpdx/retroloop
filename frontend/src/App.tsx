@@ -7,6 +7,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { FeedbackPage } from "./pages/FeedbackPage";
 import { ProjectDetailPage } from "./pages/ProjectDetailPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
+import { RetroBoardPage } from "./pages/RetroBoardPage";
 import { RegisterPage } from "./pages/RegisterPage";
 
 /**
@@ -30,6 +31,7 @@ export function AppRoutes() {
             <Route path="/projects" element={<ProjectsPage />} />
             <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
             <Route path="/projects/:projectId/feedback" element={<FeedbackPage />} />
+            <Route path="/retros/:retroId" element={<RetroBoardPage />} />
           </Route>
         </Route>
 
