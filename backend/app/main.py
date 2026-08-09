@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.auth import router as auth_router
@@ -15,7 +15,7 @@ from app.api.transcript import router as transcript_router
 from app.api.votes import router as votes_router
 from app.api.ws import router as ws_router
 from app.config import settings
-from app.database import init_db
+from app.database import database_is_reachable, init_db
 
 
 @asynccontextmanager
@@ -53,4 +53,22 @@ app.include_router(ws_router)
 
 @app.get("/api/health")
 async def health():
+    """Liveness: the process is up. It says nothing about configuration."""
     return {"status": "ok"}
+
+
+@app.get("/api/ready")
+async def ready(response: Response):
+    """Readiness: Beanie is initialised and Mongo answered a ping (#18).
+
+    Separate from liveness because they fail differently. A container that is
+    running but cannot reach its database must not be marked healthy — the
+    frontend waits on this, and there is no in-memory fallback to degrade to.
+
+    The failure body is two words. A driver error would carry the connection
+    string, and this endpoint is reachable from anywhere the app is.
+    """
+    if await database_is_reachable():
+        return {"status": "ready"}
+    response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    return {"status": "not_ready"}

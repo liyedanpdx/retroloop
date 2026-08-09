@@ -1,0 +1,54 @@
+# The local production stack (#18).
+#
+# Self-contained rather than an override, so `-f docker-compose.prod.yml` cannot
+# accidentally inherit a bind mount or a reload flag from the development file.
+# Same source, same declared dependencies, different stage: uvicorn without
+# `--reload`, and nginx serving `dist`.
+#
+# Still no database. Deployment beyond this — TLS, secret management, scaling,
+# recovery — is #33.
+
+services:
+  backend:
+    build:
+      context: ./backend
+      target: prod
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      MONGO_URL: ${MONGO_URL:?set MONGO_URL in .env}
+      MONGO_DB_NAME: ${MONGO_DB_NAME:?set MONGO_DB_NAME in .env}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET in .env}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/ready').status==200 else 1)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      target: prod
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    # No volumes, deliberately: a bind mount here would put developer source
+    # into the production image at runtime.
+    depends_on:
+      backend:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:80/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped

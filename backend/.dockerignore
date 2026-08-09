@@ -1,0 +1,28 @@
+# Nothing secret and nothing generated reaches the build context (#18).
+.env
+.env.*
+!.env.example
+
+.git
+.gitignore
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+htmlcov/
+.coverage
+
+# The suite is not part of the runtime image, and it points at a real database.
+tests/
+
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

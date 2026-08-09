@@ -1,15 +1,73 @@
+# The development stack (#18).
+#
+# Two services and no database. `_docs/decisions.md`, "MongoDB external": a
+# Mongo here would be a second database that quietly diverges from the one the
+# team actually uses, so `MONGO_URL` points at theirs and `docker compose down`
+# never touches it.
+#
+# The four required variables have no default on purpose. Compose fails with the
+# variable's name before anything starts, which is a better morning than a
+# backend that came up against `mongodb://localhost:27017` by accident.
+
 services:
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      target: dev
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
     env_file:
       - .env
-    depends_on: []
+    environment:
+      MONGO_URL: ${MONGO_URL:?set MONGO_URL in .env}
+      MONGO_DB_NAME: ${MONGO_DB_NAME:?set MONGO_DB_NAME in .env}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET in .env}
+    volumes:
+      # Source only. Editing a .py file reloads uvicorn without a rebuild.
+      - ./backend/app:/app/app
+    extra_hosts:
+      # Lets a documented host.docker.internal Mongo or proxy URL work on Linux
+      # as it already does on Docker Desktop. `localhost` inside a container is
+      # the container, which is why no README line ever says to use it.
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/ready').status==200 else 1)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      target: dev
     ports:
-      - "3000:80"
+      - "${FRONTEND_PORT:-3000}:5173"
+    environment:
+      # Where the Vite dev proxy sends /api and /ws. Not a secret, and not a
+      # value the browser ever sees — every request from the app is relative.
+      BACKEND_ORIGIN: http://backend:8000
+    volumes:
+      - ./frontend:/app
+      # Container-only node_modules, so the host bind mount cannot replace the
+      # Linux dependencies `npm ci` installed in the image.
+      - frontend_node_modules:/app/node_modules
     depends_on:
-      - backend
+      backend:
+        # Waiting for "created" would let the app come up in front of a backend
+        # that cannot reach Mongo, which is exactly the case worth catching.
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:5173/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  frontend_node_modules:

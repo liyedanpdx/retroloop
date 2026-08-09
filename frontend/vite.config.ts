@@ -9,10 +9,19 @@ export default defineConfig({
     // built image (`frontend/nginx.conf` proxies /api/ to the backend). Every
     // request in `src/api` is therefore a relative path, and the refresh cookie
     // is a first-party cookie in both.
+    //
+    // BACKEND_ORIGIN is set to http://backend:8000 by Compose and defaults to
+    // localhost for `npm run dev` on the host. It is a hostname, not a secret,
+    // and the browser never sees it.
     proxy: {
       "/api": {
-        target: "http://localhost:8000",
+        target: process.env.BACKEND_ORIGIN ?? "http://localhost:8000",
         changeOrigin: true,
+      },
+      "/ws": {
+        target: process.env.BACKEND_ORIGIN ?? "http://localhost:8000",
+        changeOrigin: true,
+        ws: true,
       },
     },
   },

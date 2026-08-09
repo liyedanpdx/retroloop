@@ -1,0 +1,19 @@
+# package.json and package-lock.json are deliberately kept: `npm ci` needs both.
+.env
+.env.*
+!.env.example
+
+.git
+.gitignore
+
+# Host dependencies are the wrong platform; the image installs its own.
+node_modules/
+dist/
+.vite/
+coverage/
+*.tsbuildinfo
+
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

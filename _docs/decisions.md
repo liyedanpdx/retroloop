@@ -407,6 +407,28 @@ root `.gitignore` rule `.env`, which is pathless and so matches at any depth.
 `.env.example` carries the key names with placeholder values and is the only one
 of the three that is committed.
 
+### Liveness and readiness are two endpoints (issue #18)
+`GET /api/health` says the process is up. `GET /api/ready` says Beanie is
+initialised and Mongo answered a `ping`, and is `503 {"status":"not_ready"}`
+otherwise. Compose health checks use readiness, and the frontend waits on it —
+a backend that cannot reach its database must never get an app in front of it,
+and there is no in-memory fallback to degrade to.
+
+The `503` body is two words. A driver error carries the connection string, and
+this endpoint is reachable from anywhere the app is. The reason goes to the
+container log instead.
+
+### The production Compose file is self-contained (issue #18)
+`docker-compose.prod.yml` is a whole file rather than an override, so `-f` on it
+cannot inherit a bind mount or a `--reload` from the development file by
+accident.
+
+### Required variables have no defaults (issue #18)
+`MONGO_URL`, `MONGO_DB_NAME`, `JWT_SECRET` and `JWT_REFRESH_SECRET` use
+Compose's `:?` form. Missing one stops the stack before anything starts, naming
+the variable — better than a backend that silently came up against
+`mongodb://localhost:27017`.
+
 ### Multi-stage frontend Dockerfile (issue #18)
 Dev mode uses vite dev with hot reload (mounted volume). Prod mode builds
 static files and serves via nginx. Compose defaults to dev mode.
