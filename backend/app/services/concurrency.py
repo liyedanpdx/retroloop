@@ -19,7 +19,11 @@ from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 
-from app.models.retro import Retrospective
+from app.models.retro import EXTRACTION_STATUSES, Retrospective
+
+# 从常量里取,不要在这里把字符串再写一遍 —— #10 的规则是这些值只活在
+# `app/models/retro.py` 和 schemas 的 `Literal` 里。
+_IDLE, _PROCESSING, _READY, _FAILED = EXTRACTION_STATUSES
 
 CLOSED_DETAIL = "The retrospective's cycle is closed"
 
@@ -77,12 +81,12 @@ async def close_retro_writes(
                     **changes,
                     "ai_suggestions": {
                         "$cond": [
-                            {"$eq": ["$ai_suggestions.status", "processing"]},
+                            {"$eq": ["$ai_suggestions.status", _PROCESSING]},
                             {
                                 "$mergeObjects": [
                                     "$ai_suggestions",
                                     {
-                                        "status": "failed",
+                                        "status": _FAILED,
                                         "error": None,
                                         "completed_at": _now_iso(),
                                     },
@@ -116,3 +120,17 @@ async def reopen_retro_writes(retro: Retrospective, *, phase: str | None = None)
     retro.writes_closed_at = None
     if phase is not None:
         retro.phase = phase
+
+
+async def save_retro_ignoring_close(retro: Retrospective) -> None:
+    """无视封锁提交,只给保留策略用 (#25 与 #34 的交点)。
+
+    `save_retro` 挡住的是「回顾的内容在关闭之后还被改动」。删除 transcript 不是
+    那种写:#25 已经决定它必须在任何阶段、包括已发布的关闭周期上都能用,因为
+    一个在回顾结束后就失效的保留控制,恰好在最需要它的时候没用。
+
+    这是唯一一个被允许绕过去的写,而且它只会让 retro 里的东西变少。
+    """
+    await Retrospective.get_motor_collection().replace_one(
+        {"_id": retro.id}, retro.model_dump(by_alias=True)
+    )

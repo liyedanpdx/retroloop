@@ -223,7 +223,14 @@ async def test_the_status_strings_are_not_written_out_in_handlers():
     `"pending"` is skipped: it is also a topic status, spelled out in #9's own
     `Literal`, and this is a rule about where #10's strings live.
     """
-    allowed = {APP_DIR / "models" / "retro.py", APP_DIR / "schemas" / "transcript.py"}
+    # `app/main.py` 在名单里,不是因为它写了 #10 的状态,而是因为 #18 的
+    # readiness 探针恰好也叫 "ready" —— 两个不相干的词撞在一起。规则要管的是
+    # 抽取状态别散落各处,不是禁止这个英文单词。
+    allowed = {
+        APP_DIR / "models" / "retro.py",
+        APP_DIR / "schemas" / "transcript.py",
+        APP_DIR / "main.py",
+    }
     for value in [v for v in EXTRACTION_STATUSES + SUGGESTION_STATES if v != "pending"]:
         spelled = {
             path

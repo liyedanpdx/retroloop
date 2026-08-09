@@ -284,13 +284,20 @@ async def test_advancing_to_discuss_a_second_time_is_refused(
 
 
 @pytest.mark.asyncio
-async def test_topics_carry_no_name_field():
-    """The name is the cluster's, resolved at read time — never stored on a topic."""
+async def test_a_generated_topic_has_no_name_of_its_own():
+    """名字来自 cluster,读的时候解析出来 —— 生成的 topic 不会自己存一份。
+
+    #22 之后仍然没有 `name` 字段,只多了一个 `name_override`,而且生成的 topic
+    的 override 是 None:改名是有人主动改的,不是生成时就带上的。
+    """
     assert "name" not in Topic.model_fields
 
     retro = _build_retro(["c1"])
     topic = create_topics(retro)[0]
-    assert set(topic.model_dump()) == {"id", "cluster_id", "vote_count", "rank", "status", "notes"}
+    assert set(topic.model_dump()) == {
+        "id", "cluster_id", "name_override", "vote_count", "rank", "status", "notes"
+    }
+    assert topic.name_override is None
 
 
 # --- PATCH /api/retros/{id}/topics/{tid} -------------------------------------
@@ -391,7 +398,11 @@ async def test_the_topic_response_carries_its_clusters_name(
 async def test_the_topic_snapshot_fields_cannot_be_written(
     client, auth_headers, discussion_retro
 ):
-    """`cluster_id`, `vote_count` and `rank` are not in the request schema at all."""
+    """`cluster_id` 和 `vote_count` 根本不在请求 schema 里。
+
+    `rank` 在 #22 之后可以改了 —— 它现在是议程顺序,不再是计票顺序。但计票的
+    快照本身仍然不可写:一个投票数能被编辑的 topic 会让总结变成主张而不是记录。
+    """
     retro = discussion_retro["retro"]
     topic = discussion_retro["topics"][0]
 
@@ -399,7 +410,7 @@ async def test_the_topic_snapshot_fields_cannot_be_written(
         client,
         retro["id"],
         topic["id"],
-        {"cluster_id": UNKNOWN_UUID, "vote_count": 99, "rank": 7, "status": "discussed"},
+        {"cluster_id": UNKNOWN_UUID, "vote_count": 99, "status": "discussed"},
         auth_headers,
     )
     assert resp.status_code == 200, resp.text
@@ -1330,7 +1341,12 @@ async def test_the_retro_payload_carries_every_mutation(
     assert len(topics) == 3
     for entry in topics:
         assert entry["name"] == names[entry["cluster_id"]], "resolved, not stored"
-        assert set(entry) == {"id", "cluster_id", "name", "vote_count", "rank", "status", "notes"}
+        # `name_override` 也在载荷里 (#22):客户端要能分辨「这是有人改过的
+        # 名字」还是「这是 cluster 的名字」,否则「恢复原名」无从提供。
+        assert set(entry) == {
+            "id", "cluster_id", "name", "name_override", "vote_count", "rank",
+            "status", "notes",
+        }
     assert topics[0]["status"] == "discussed"
     assert topics[0]["notes"] == "WIP limits"
     assert [t["rank"] for t in topics] == [1, 2, 3]

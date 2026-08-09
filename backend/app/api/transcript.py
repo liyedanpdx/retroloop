@@ -32,7 +32,7 @@ from app.schemas.transcript import (
     TranscriptRequest,
 )
 from app.services.ai_budget import consume_ai_budget
-from app.services.concurrency import save_retro
+from app.services.concurrency import save_retro, save_retro_ignoring_close
 from app.services.access import get_retro_for_facilitator, require_cycle_open, require_phase
 from app.services.transcript import (
     PROCESSING,
@@ -147,7 +147,8 @@ async def delete_transcript(retro_id: str, user: User = Depends(get_current_user
 
     retro.transcript = None
     retro.ai_suggestions = None
-    await save_retro(retro)
+    # 保留策略要在关闭之后仍然有效 (#25),所以这一次写绕过 #34 的封锁。
+    await save_retro_ignoring_close(retro)
 
 
 @router.post("/retros/{retro_id}/suggestions/confirm", response_model=ConfirmResponse)
