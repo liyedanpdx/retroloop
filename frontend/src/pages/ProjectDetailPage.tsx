@@ -1,18 +1,21 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { isAxiosError } from "axios";
 
 import {
   FACILITATOR,
   addMember,
+  createCycle,
   getDashboard,
   getProject,
   removeMember,
   roleIn,
   setArchived,
+  startRetro,
   updateMemberRole,
   updateProject,
   type Dashboard,
+  type DashboardCycle,
   type DashboardMember,
   type Project,
 } from "../api/projects";
@@ -108,7 +111,12 @@ export function ProjectDetailPage() {
       <section className="space-y-2">
         <h2 className="text-xl font-semibold">Current cycle</h2>
         {cycle === null ? (
-          <p>No active cycle</p>
+          <div className="space-y-2">
+            <p>No active cycle</p>
+            {isFacilitator && (
+              <CycleLifecycle projectId={project.id} cycle={null} onChanged={load} />
+            )}
+          </div>
         ) : (
           <div className="space-y-1">
             <p>Status: {cycle.status}</p>
@@ -129,7 +137,12 @@ export function ProjectDetailPage() {
                 <Link to={`/retros/${cycle.retro.id}`}>Open the retrospective</Link>
               </p>
             ) : (
-              <p>No retrospective started</p>
+              <>
+                <p>No retrospective started</p>
+                {isFacilitator && (
+                  <CycleLifecycle projectId={project.id} cycle={cycle} onChanged={load} />
+                )}
+              </>
             )}
           </div>
         )}
@@ -337,6 +350,118 @@ function Settings({
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * 开一个周期,和开始回顾 (#36)。
+ *
+ * 这两个接口从 #4 和 #6 就在了,但三个前端 issue 各自把它们划给了另外两个,
+ * 结果谁也没做 —— 于是一个新项目除了改名和邀请人之外无路可走。
+ *
+ * 开始回顾要先问一句:它会揭示所有卡片并把它们冻结,而且没有任何接口能退回
+ * collecting。开周期不用问,一个空周期删掉它的代价只是关掉它。
+ */
+function CycleLifecycle({
+  projectId,
+  cycle,
+  onChanged,
+}: {
+  projectId: string;
+  cycle: DashboardCycle | null;
+  onChanged: () => Promise<void>;
+}) {
+  const navigate = useNavigate();
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+
+  function fail(failure: unknown) {
+    const status = isAxiosError(failure) ? failure.response?.status : undefined;
+    setError(
+      status === 409
+        ? "这个项目已经有一个进行中的周期了。"
+        : status === 403
+          ? PERMISSION_CHANGED
+          : status === 400
+            ? "现在的状态下做不了这件事。"
+            : GENERIC_FAILURE
+    );
+    // 409 和 400 说明我们看到的状态已经旧了,重新取一次比留着旧的诚实。
+    if (status === 409 || status === 400 || status === 403) {
+      void onChanged();
+    }
+  }
+
+  if (cycle === null) {
+    return (
+      <div>
+        <button
+          type="button"
+          disabled={pending}
+          className="rounded bg-gray-900 px-4 py-2 text-white disabled:opacity-50"
+          onClick={() => {
+            setPending(true);
+            setError(null);
+            createCycle(projectId)
+              .then(() => {
+                // 直接送到写反馈的地方 —— 开周期的目的就是让人开始写。
+                navigate(`/projects/${projectId}/feedback`);
+              })
+              .catch(fail)
+              .finally(() => setPending(false));
+          }}
+        >
+          {pending ? "开启中…" : "Start a feedback cycle"}
+        </button>
+        {error && <p role="alert">{error}</p>}
+      </div>
+    );
+  }
+
+  if (cycle.status !== "collecting") {
+    return null;
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        disabled={pending}
+        className="rounded bg-gray-900 px-4 py-2 text-white disabled:opacity-50"
+        onClick={() => setConfirming(true)}
+      >
+        {pending ? "开启中…" : "Start the retrospective"}
+      </button>
+      {error && <p role="alert">{error}</p>}
+
+      {confirming && (
+        <div role="dialog" aria-modal="true" aria-label="Start the retrospective">
+          <p>
+            开始回顾会把每个人的卡片揭示给全组,并且从此冻结 —— 没人能再改或者
+            删自己的卡。没有办法退回收集阶段。
+          </p>
+          <button
+            type="button"
+            className="underline"
+            onClick={() => {
+              setConfirming(false);
+              setPending(true);
+              setError(null);
+              startRetro(cycle.id)
+                .then((retro) => navigate(`/retros/${retro.id}`))
+                .catch(fail)
+                .finally(() => setPending(false));
+            }}
+          >
+            Yes, reveal the cards
+          </button>
+          <button type="button" className="ml-3 underline" onClick={() => setConfirming(false)}>
+            Cancel
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

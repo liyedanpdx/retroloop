@@ -143,3 +143,19 @@ export async function updateMemberRole(
 ): Promise<void> {
   await api.patch(`/api/projects/${projectId}/members/${userId}`, { role });
 }
+
+export type NewCycle = { id: string; project_id: string; status: string };
+
+/** 开一个 collecting 周期 (#4)。一个项目同时只能有一个开着的,重复开是 409。 */
+export async function createCycle(projectId: string): Promise<NewCycle> {
+  return (await api.post<NewCycle>(`/api/projects/${projectId}/cycles`)).data;
+}
+
+/**
+ * 开始回顾 (#6):揭示所有卡片,并把它们冻结。
+ *
+ * 单向的,所以调用它的地方必须先问一句 —— 没有任何接口能退回 collecting。
+ */
+export async function startRetro(cycleId: string): Promise<{ id: string }> {
+  return (await api.post<{ id: string }>(`/api/cycles/${cycleId}/retro`)).data;
+}

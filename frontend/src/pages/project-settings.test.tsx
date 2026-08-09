@@ -247,3 +247,109 @@ describe("member roles", () => {
     expect(screen.queryByLabelText("Role of Bob")).not.toBeInTheDocument();
   });
 });
+
+// --- 开周期和开始回顾 (#36) ---------------------------------------------------
+
+describe("the cycle lifecycle", () => {
+  it("offers to start a cycle when there is none, and lands on the feedback page", async () => {
+    const calls = renderDetail({
+      "POST /api/projects/p1/cycles": {
+        status: 201,
+        data: { id: "c9", project_id: "p1", status: "collecting" },
+      },
+      // 落地页自己要拉的东西 —— 不 stub 的话假传输层会抛「未打桩的请求」。
+      "GET /api/projects/p1/cycles": {
+        status: 200,
+        data: [
+          {
+            id: "c9",
+            project_id: "p1",
+            status: "collecting",
+            created_at: "2026-02-01T00:00:00Z",
+            closed_at: null,
+            created_by: ALICE.id,
+          },
+        ],
+      },
+      "GET /api/cycles/c9/feedback": { status: 200, data: [] },
+    });
+    await screen.findByRole("heading", { name: "Team Alpha" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Start a feedback cycle" }));
+
+    await waitFor(() => expect(callsTo(calls, "POST", "/api/projects/p1/cycles")).toHaveLength(1));
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Your feedback" })).toBeInTheDocument()
+    );
+  });
+
+  it("explains a project that already has one, and refetches", async () => {
+    const calls = renderDetail({ "POST /api/projects/p1/cycles": { status: 409 } });
+    await screen.findByRole("heading", { name: "Team Alpha" });
+    const before = callsTo(calls, "GET", "/api/projects/p1/dashboard").length;
+
+    fireEvent.click(screen.getByRole("button", { name: "Start a feedback cycle" }));
+
+    expect(await screen.findByText(/已经有一个进行中的周期/)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(callsTo(calls, "GET", "/api/projects/p1/dashboard").length).toBeGreaterThan(before)
+    );
+  });
+
+  it("warns before revealing, because there is no way back", async () => {
+    const calls = renderDetail({
+      "GET /api/projects/p1/dashboard": {
+        status: 200,
+        data: {
+          ...DASHBOARD,
+          current_cycle: {
+            id: "c1",
+            status: "collecting",
+            created_at: "2026-02-01T00:00:00Z",
+            closed_at: null,
+            progress: { submitted_members: 2, total_members: 2 },
+            retro: null,
+          },
+        },
+      },
+      "POST /api/cycles/c1/retro": { status: 201, data: { id: "r9" } },
+      "GET /api/retros/r9": { status: 404 },
+    });
+    await screen.findByRole("heading", { name: "Team Alpha" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Start the retrospective" }));
+    const dialog = await screen.findByRole("dialog", { name: "Start the retrospective" });
+    expect(within(dialog).getByText(/从此冻结/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/没有办法退回收集阶段/)).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(callsTo(calls, "POST", "/api/cycles/c1/retro")).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Start the retrospective" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Yes, reveal the cards" }));
+    await waitFor(() => expect(callsTo(calls, "POST", "/api/cycles/c1/retro")).toHaveLength(1));
+  });
+
+  it("shows neither control to a plain member", async () => {
+    renderDetail({
+      "GET /api/projects/p1": {
+        status: 200,
+        data: projectDoc({
+          members: [
+            { user_id: ALICE.id, role: "member", joined_at: "2026-01-01T00:00:00Z" },
+            { user_id: BOB_ID, role: "facilitator", joined_at: "2026-01-05T00:00:00Z" },
+          ],
+        }),
+      },
+    });
+    await screen.findByRole("heading", { name: "Team Alpha" });
+
+    expect(
+      screen.queryByRole("button", { name: "Start a feedback cycle" })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Start the retrospective" })
+    ).not.toBeInTheDocument();
+  });
+});
