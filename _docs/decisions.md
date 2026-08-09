@@ -88,6 +88,12 @@ the count alone would allow in a one-member project. And the marker is not
 removed when a member deletes their cards, because an anonymous card carries
 nothing to recount from — it records that they took part, which remains true.
 
+One consequence worth knowing before writing a test: the marker is written by
+`POST /api/cycles/{id}/feedback`, so a card inserted straight into the database
+does not register participation. There is no other way to create a card through
+the product, but a test that builds one at the document level has to set the
+marker itself.
+
 ### Cards freeze at reveal (issue #6)
 Once the cycle leaves `collecting`, feedback cards are read-only: `PATCH` and
 `DELETE /api/feedback/{id}` return 400. Creation is already blocked at that point.

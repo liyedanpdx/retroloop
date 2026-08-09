@@ -138,14 +138,19 @@ async def test_a_member_counts_once_however_many_cards_they_wrote(
 
 
 @pytest.mark.asyncio
-async def test_an_anonymous_only_submitter_cannot_be_counted(
+async def test_an_anonymous_only_submitter_is_counted(
     client, auth_headers, second_auth_headers, project_with_member, shared_cycle, add_card
 ):
-    """#5 erased the author, so there is nothing to count. #28 owns fixing it."""
+    """#28 fixed what #31 had to leave undone.
+
+    This asserted 0 when it was written: #5 erased the author, so there was
+    nothing on the card to count. #28 put the marker on the cycle instead, and
+    the count is now exact.
+    """
     await add_card(shared_cycle["id"], headers=second_auth_headers, is_anonymous=True)
 
     response = await client.get(_url(project_with_member["id"]), headers=auth_headers)
-    assert response.json()["current_cycle"]["progress"]["submitted_members"] == 0
+    assert response.json()["current_cycle"]["progress"]["submitted_members"] == 1
 
 
 @pytest.mark.asyncio
@@ -240,8 +245,9 @@ async def test_open_actions_are_listed_with_owners_and_closed_ones_are_not(
 
     assert [a["id"] for a in actions] == [assigned.json()["id"], unassigned.json()["id"]]
     assert set(actions[0]) == {
-        "id", "retro_id", "description", "owner_id", "owner", "due_date", "status"
-    }
+        "id", "retro_id", "description", "owner_id", "owner", "owner_state", "due_date",
+        "status",
+    }, "owner_state joined the shape in #23"
     assert actions[0]["owner"] == "Bob"
     assert actions[0]["retro_id"] == retro_id
     assert actions[0]["status"] == "open"

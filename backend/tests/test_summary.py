@@ -48,13 +48,20 @@ async def test_summary_full_shape_order_resolution_and_participation(
     retro.votes.append(Vote(user_id=PydanticObjectId(), cluster_ids=[]))
     await retro.save()
 
-    # Repeated authored cards count Alice once; anonymous cards cannot count.
+    # Repeated authored cards count a member once, and an anonymous card counts
+    # its author too since #28. These are written straight to the database
+    # because the cycle has left `collecting`, which also means they bypass the
+    # create endpoint that records participation — so the marker is set here as
+    # that endpoint would have set it.
     await FeedbackCard(
         cycle_id=retro.cycle_id, author_id=bob.id, category="continue", text="Bob card"
     ).insert()
     await FeedbackCard(
         cycle_id=retro.cycle_id, author_id=None, category="stop", text="Secret", is_anonymous=True
     ).insert()
+    cycle = await Cycle.get(retro.cycle_id)
+    cycle.participants = [alice.id, bob.id]
+    await cycle.save()
     other_cycle = await Cycle(project_id=project.id, created_by=alice.id).insert()
     await FeedbackCard(
         cycle_id=other_cycle.id, author_id=alice.id, category="start", text="Other cycle"
@@ -80,6 +87,9 @@ async def test_summary_full_shape_order_resolution_and_participation(
     assert body["actions"][0]["due_date"].startswith("2026-09-01T12:00:00")
     assert body["actions"][1]["owner"] == "Dana Wu"
     assert body["actions"][2]["owner"] is None
+    # Two attributed submitters plus the anonymous card's author, who #28's
+    # cycle marker can now count and this assertion could not when it was
+    # written. Alice and Bob are both members, so the total is still 2.
     assert body["participation"] == {"total_members": 2, "submitted_feedback": 2, "voted": 2}
     assert "Other cycle" not in [row["text"] for row in body["feedback_cards"]]
     assert [row["created_at"] for row in body["feedback_cards"]] == sorted(row["created_at"] for row in body["feedback_cards"])
