@@ -228,6 +228,10 @@ export function TranscriptPage() {
             : current
         );
         setPollError(null);
+      } else if (code === 429) {
+        setFormError(
+          "This project has used its AI requests for now. Try again later."
+        );
       } else if (code === 422) {
         setFormError("That transcript was rejected. Check the text and try again.");
       } else if (code === 400 || code === 403) {

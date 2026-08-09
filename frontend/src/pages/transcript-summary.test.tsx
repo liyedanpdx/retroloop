@@ -266,6 +266,17 @@ describe("pasting", () => {
     });
   });
 
+  it("names a spent AI budget instead of blaming the transcript", async () => {
+    renderAt("/retros/r1/transcript", base({ "POST /api/retros/r1/transcript": { status: 429 } }));
+    const box = await screen.findByLabelText("Paste the meeting transcript");
+
+    fireEvent.change(box, { target: { value: "we agreed" } });
+    fireEvent.click(screen.getByRole("button", { name: "Extract" }));
+
+    expect(await screen.findByText(/used its AI requests for now/)).toBeInTheDocument();
+    expect(box).toHaveValue("we agreed", "文本还在,等会儿再试就行");
+  });
+
   it("treats a 409 as already running rather than a failure", async () => {
     const calls = renderAt(
       "/retros/r1/transcript",

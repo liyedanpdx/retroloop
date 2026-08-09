@@ -494,6 +494,11 @@ export function describe(error: unknown): string {
   if (status === 422) {
     return "That value is not valid.";
   }
+  if (status === 429) {
+    // #27 的项目额度用完了。这不是失败,是「等一会儿」,措辞要能让人分辨
+    // ——不然一个还能用的功能看起来像坏了。
+    return "This project has used its AI requests for now. Try again later.";
+  }
   if (status === 502 || status === 504) {
     return "The AI suggestion is unavailable right now.";
   }

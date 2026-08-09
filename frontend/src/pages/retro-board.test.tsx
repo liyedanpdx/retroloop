@@ -1033,3 +1033,29 @@ describe("withdrawing a ballot", () => {
     expect(screen.getByText("Vote submitted")).toBeInTheDocument();
   });
 });
+
+// --- 用完额度不是坏了 (#27) ---------------------------------------------------
+
+describe("the AI budget", () => {
+  it("says the project has used its requests rather than that something broke", async () => {
+    renderBoard(
+      board({
+        "GET /api/retros/r1": {
+          status: 200,
+          data: retro({ phase: "cluster", clusters: [CLUSTER] }),
+        },
+        "POST /api/retros/r1/clusters/suggest": { status: 429 },
+      })
+    );
+    await ready();
+
+    fireEvent.click(screen.getByRole("button", { name: "Suggest clusters" }));
+
+    expect(
+      await screen.findByText(/used its AI requests for now/)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Something went wrong/)).not.toBeInTheDocument();
+    // 还能再试,只是现在不行。
+    expect(screen.getByText("You can ask again.")).toBeInTheDocument();
+  });
+});
