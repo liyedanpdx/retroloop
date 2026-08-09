@@ -74,6 +74,37 @@ export function applyEvent(board: BoardData, event: RetroEvent): BoardData {
       };
     }
 
+    case "vote_retracted": {
+      // Only that member's submission disappears, and their choices were never
+      // here to lose (#21). Idempotent: removing an id that is already gone
+      // leaves the list alone, so an echoed event cannot decrement twice.
+      const userId = data.user_id;
+      if (typeof userId !== "string") {
+        return board;
+      }
+      return {
+        ...board,
+        retro: {
+          ...board.retro,
+          votes: board.retro.votes.filter((vote) => vote.user_id !== userId),
+        },
+      };
+    }
+
+    case "vote_submitted": {
+      const userId = data.user_id;
+      if (typeof userId !== "string" || board.retro.votes.some((v) => v.user_id === userId)) {
+        return board;
+      }
+      return {
+        ...board,
+        retro: {
+          ...board.retro,
+          votes: [...board.retro.votes, { user_id: userId, submitted_at: "" }],
+        },
+      };
+    }
+
     case "topic_updated": {
       const topic = data as unknown as Topic;
       if (typeof topic?.id !== "string") {

@@ -242,10 +242,34 @@ describe("applying an event", () => {
     expect(merged.retro.topics[0].status).toBe("discussed");
   });
 
+  it("adds and removes a submitter without ever touching a choice", () => {
+    const submitted = applyEvent(BOARD, {
+      event: "vote_submitted",
+      data: { user_id: "u9" },
+    });
+    expect(submitted.retro.votes.map((vote) => vote.user_id)).toEqual(["u9"]);
+    // The echo of the same event does not count them twice.
+    expect(
+      applyEvent(submitted, { event: "vote_submitted", data: { user_id: "u9" } }).retro.votes
+    ).toHaveLength(1);
+    expect(JSON.stringify(submitted)).not.toContain("cluster_ids");
+
+    const retracted = applyEvent(submitted, {
+      event: "vote_retracted",
+      data: { user_id: "u9" },
+    });
+    expect(retracted.retro.votes).toEqual([]);
+    // And so does the echo of the retraction.
+    expect(
+      applyEvent(retracted, { event: "vote_retracted", data: { user_id: "u9" } }).retro.votes
+    ).toEqual([]);
+  });
+
   it("ignores what it does not handle rather than breaking the board", () => {
     for (const event of [
       { event: "phase_changed", data: { phase: "vote" } },
       { event: "voting_closed", data: {} },
+      { event: "vote_retracted", data: {} },
       { event: "invented_by_nobody", data: { id: "x" } },
       { event: "cluster_created", data: {} },
       { event: "card_moved", data: {} },
