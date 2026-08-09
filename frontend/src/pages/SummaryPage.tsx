@@ -143,8 +143,13 @@ export function SummaryPage() {
       <header className="space-y-1">
         <h1>Retrospective summary</h1>
         <p role="status">{published ? "Published" : "Preview"}</p>
-        <p>
+        {/* 从会议原文抽出来的东西也落在这一页上,所以这一页得能走回去 —— 少
+            keep 了一条草稿的人,否则找不到回头的路。 */}
+        <p className="flex flex-wrap gap-4">
           <Link to={`/retros/${retro.id}`}>Back to the board</Link>
+          {isFacilitator && !published && (
+            <Link to={`/retros/${retro.id}/transcript`}>Meeting text and drafts</Link>
+          )}
         </p>
       </header>
 
@@ -205,7 +210,8 @@ export function SummaryPage() {
           <ul className="space-y-1">
             {summary.decisions.map((decision) => (
               <li key={decision.id} className="break-words">
-                {decision.text} ({decision.topic ?? "Unlinked"})
+                {decision.text} ({decision.topic ?? "Unlinked"}){" "}
+                {decision.from_transcript && <FromTranscript />}
               </li>
             ))}
           </ul>
@@ -221,7 +227,8 @@ export function SummaryPage() {
             {summary.actions.map((action) => (
               <li key={action.id} className="break-words">
                 {action.description} ({action.topic ?? "Unlinked"}) · {action.owner ?? "Unassigned"}{" "}
-                · {formatDate(action.due_date, "No due date")} · {action.status}
+                · {formatDate(action.due_date, "No due date")} · {action.status}{" "}
+                {action.from_transcript && <FromTranscript />}
               </li>
             ))}
           </ul>
@@ -268,6 +275,20 @@ export function SummaryPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+/**
+ * 这一条是从会议原文里抽出来、再被主持人确认过的 (#10)。
+ *
+ * 说的是出处,不是「AI 写的」—— 每一条都有人点过 Keep。不标的话,跑完抽取的人
+ * 在这一页上分不出哪些是自己那一轮的结果,会以为抽取白跑了。
+ */
+function FromTranscript() {
+  return (
+    <span className="badge" title="Confirmed from the meeting text">
+      from transcript
+    </span>
   );
 }
 

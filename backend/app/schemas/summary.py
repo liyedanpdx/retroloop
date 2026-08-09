@@ -13,11 +13,17 @@ class SummaryTopic(BaseModel):
     notes: str
 
 
+# Whether this entry started life as a draft pulled out of the meeting text
+# (#10) rather than as something somebody typed. The summary reads the same
+# either way, and a reader who cannot tell the two apart has no way to know
+# whether the extraction they ran actually landed. It says where it came from,
+# not that a machine decided it — a facilitator confirmed every one of these.
 class SummaryDecision(BaseModel):
     id: str
     topic_id: str | None
     topic: str | None
     text: str
+    from_transcript: bool = False
 
 
 class SummaryAction(BaseModel):
@@ -27,6 +33,7 @@ class SummaryAction(BaseModel):
     description: str
     owner_id: str | None
     owner: str | None
+    from_transcript: bool = False
     # `unassigned` | `assigned` | `orphaned` (#23). A published summary still
     # says which, because a commitment nobody is left to keep is exactly the
     # thing a team needs to notice when they read it back.

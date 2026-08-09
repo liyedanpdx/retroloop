@@ -99,7 +99,11 @@ const SUMMARY = {
       notes: "went well",
     },
   ],
-  decisions: [{ id: "d1", topic_id: "t1", topic: "Flow", text: "Ship on Fridays" }],
+  // 一条从会议原文里确认过来的,一条手写的 —— 这一页要能把两者分开。
+  decisions: [
+    { id: "d1", topic_id: "t1", topic: "Flow", text: "Ship on Fridays", from_transcript: true },
+    { id: "d2", topic_id: null, topic: null, text: "Keep the standup", from_transcript: false },
+  ],
   actions: [
     {
       id: "a1",
@@ -110,6 +114,7 @@ const SUMMARY = {
       owner: "Bob",
       due_date: null,
       status: "open",
+      from_transcript: false,
     },
   ],
   participation: { total_members: 2, submitted_feedback: 1, voted: 2 },
@@ -533,6 +538,21 @@ describe("reviewing the drafts", () => {
     });
   });
 
+  it("counts down the drafts nobody has decided on yet", async () => {
+    // 只要有一项被选,「Apply review」就亮了 —— 剩下的会静静留在 pending,
+    // 而这一页看起来像是全处理完了。这条测试守住那句提醒。
+    renderAt("/retros/r1/transcript", reviewing());
+    await screen.findByRole("heading", { name: "Review the drafts" });
+
+    expect(screen.getByText(/2 drafts are still left to keep or reject/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText("Keep “Ship on Fridays”"));
+    expect(screen.getByText(/1 draft is still left to keep or reject/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText("Reject “Write the runbook”"));
+    expect(screen.queryByText(/still left to keep or reject/)).not.toBeInTheDocument();
+  });
+
   it("sends a kept action with its owner and ISO due date", async () => {
     const calls = renderAt(
       "/retros/r1/transcript",
@@ -679,6 +699,27 @@ describe("the summary", () => {
     expect(screen.getByText("2 voted")).toBeInTheDocument();
     expect(screen.getByText("pair more often")).toBeInTheDocument();
     expect(screen.getByText("No Continue cards")).toBeInTheDocument();
+  });
+
+  it("says which entries came from the meeting text, and offers the way back", async () => {
+    renderAt("/retros/r1/summary", summarising());
+    await screen.findByRole("heading", { name: "Retrospective summary" });
+
+    // 跑过抽取的人得能在这一页上认出自己那一轮的结果 —— 不然「apply」看起来
+    // 就像没发生过,而这正是这条测试要守住的东西。
+    const extracted = screen.getByText(/Ship on Fridays/).closest("li")!;
+    expect(within(extracted).getByText("from transcript")).toBeInTheDocument();
+
+    const typed = screen.getByText(/Keep the standup/).closest("li")!;
+    expect(within(typed).queryByText("from transcript")).not.toBeInTheDocument();
+
+    const runbook = screen.getByText(/Write the runbook/).closest("li")!;
+    expect(within(runbook).queryByText("from transcript")).not.toBeInTheDocument();
+
+    expect(screen.getByRole("link", { name: "Meeting text and drafts" })).toHaveAttribute(
+      "href",
+      "/retros/r1/transcript"
+    );
   });
 
   it("never names an anonymous card's author", async () => {

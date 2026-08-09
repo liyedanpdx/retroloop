@@ -15,6 +15,23 @@ from app.services.discussion import owner_state, topic_name
 from app.services.votes import members_voted
 
 
+def _confirmed_from_transcript(retro: Retrospective) -> set[str]:
+    """The decision and action ids that a confirmed draft created (#10).
+
+    `ai_suggestions` is a plain dict, so this reads defensively: a retro that
+    never ran an extraction, one still processing, and one whose drafts were
+    deleted along with the transcript (#25) all have to come back empty rather
+    than raise. Losing the marks is a cosmetic loss; failing the summary is not.
+    """
+    drafts = retro.ai_suggestions or {}
+    created: set[str] = set()
+    for key in ("decisions", "actions"):
+        for row in drafts.get(key) or []:
+            if isinstance(row, dict) and isinstance(row.get("created_id"), str):
+                created.add(row["created_id"])
+    return created
+
+
 async def assemble_summary(retro: Retrospective, project: Project) -> SummaryResponse:
     """Assemble the current source documents; no summary snapshot is stored."""
     ordered_topics = sorted(retro.topics, key=lambda topic: topic.rank)
@@ -40,6 +57,8 @@ async def assemble_summary(retro: Retrospective, project: Project) -> SummaryRes
     cycle = await load_cycle(str(retro.cycle_id))
     submitters = set(cycle.participants) & current_member_ids
 
+    from_transcript = _confirmed_from_transcript(retro)
+
     return SummaryResponse(
         topics=[
             SummaryTopic(
@@ -59,6 +78,7 @@ async def assemble_summary(retro: Retrospective, project: Project) -> SummaryRes
                 topic_id=decision.topic_id,
                 topic=names.get(decision.topic_id),
                 text=decision.text,
+                from_transcript=decision.id in from_transcript,
             )
             for decision in retro.decisions
             if decision.is_confirmed
@@ -77,6 +97,7 @@ async def assemble_summary(retro: Retrospective, project: Project) -> SummaryRes
                 owner_state=owner_state(action, project),
                 due_date=action.due_date,
                 status=action.status,
+                from_transcript=action.id in from_transcript,
             )
             for action in retro.actions
         ],

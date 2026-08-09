@@ -388,6 +388,17 @@ IP,按 IP 会把整个团队一起锁掉,而攻击者换 IP 比换目标容易),
 GET /summary aggregates data from the retro document on each request. No
 separate summary document — keeps data consistent and avoids sync issues.
 
+### 摘要说得出每一条的出处 (issue #11)
+`decisions` 和 `actions` 各多一个 `from_transcript`,由 `ai_suggestions` 里的
+`created_id` 反查得出——出处没有存在决定和行动自己身上,#10 把这条线索留在草稿
+那一侧,而摘要是每次读的时候现拼的,顺手连上就是了。
+
+这不是「AI 生成」的标签:能进摘要的每一条都被主持人点过 Keep。它回答的是另一个
+问题——刚跑完一轮抽取的人,在这一页上分不出哪些是自己那一轮的结果,于是会以为
+抽取白跑了。`ai_suggestions` 是个没有模型的 dict,所以这段读得很防御:从没跑过
+抽取的、正在跑的、以及草稿随 transcript 一起被删掉的 (#25),都要落回全 `false`。
+丢掉标记只是难看,让整个摘要因为一个字典形状不对而失败不是。
+
 ### Publish is one-way (issue #11)
 Once published, the retro phase moves to done and the cycle closes. There is
 no unpublish. If a mistake is found, edit decisions/actions before publishing.

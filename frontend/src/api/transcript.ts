@@ -61,7 +61,13 @@ export type SummaryTopic = {
 
 export type Summary = {
   topics: SummaryTopic[];
-  decisions: { id: string; topic_id: string | null; topic: string | null; text: string }[];
+  decisions: {
+    id: string;
+    topic_id: string | null;
+    topic: string | null;
+    text: string;
+    from_transcript: boolean;
+  }[];
   actions: {
     id: string;
     topic_id: string | null;
@@ -71,6 +77,7 @@ export type Summary = {
     owner: string | null;
     due_date: string | null;
     status: string;
+    from_transcript: boolean;
   }[];
   participation: { total_members: number; submitted_feedback: number; voted: number };
   feedback_cards: {

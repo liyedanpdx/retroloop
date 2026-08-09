@@ -454,6 +454,10 @@ function Review({
     (row) => unconfirmed(row.state) && actions[row.id]?.choice !== "pending"
   );
   const anyChosen = chosenDecisions.length + chosenActions.length > 0;
+  const openDrafts =
+    suggestions.decisions.filter((row) => unconfirmed(row.state)).length +
+    suggestions.actions.filter((row) => unconfirmed(row.state)).length;
+  const undecided = openDrafts - chosenDecisions.length - chosenActions.length;
 
   if (suggestions.decisions.length === 0 && suggestions.actions.length === 0) {
     return <p role="status">No suggestions found in that transcript.</p>;
@@ -664,6 +668,15 @@ function Review({
             </li>
           ))}
         </ul>
+      )}
+
+      {/* 一份草稿没被选中就什么都不会发生 —— 而「Apply review」一亮起来就像是
+          把整页都处理了。剩下的会静静地停在 pending,谁也不会再回来看它们。 */}
+      {undecided > 0 && (
+        <p role="status" className="meta">
+          {undecided} {undecided === 1 ? "draft is" : "drafts are"} still left to keep or reject.
+          Applying now leaves {undecided === 1 ? "it" : "them"} here for later.
+        </p>
       )}
 
       <button

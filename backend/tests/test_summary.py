@@ -77,8 +77,8 @@ async def test_summary_full_shape_order_resolution_and_participation(
     assert body["topics"][0]["notes"] == ""
     assert [row["id"] for row in body["decisions"]] == ["d1", "d3"]
     assert body["decisions"] == [
-        {"id": "d1", "topic_id": topic.id, "topic": next(c.name for c in retro.clusters if c.id == topic.cluster_id), "text": "Keep it"},
-        {"id": "d3", "topic_id": None, "topic": None, "text": "Ship it"},
+        {"id": "d1", "topic_id": topic.id, "topic": next(c.name for c in retro.clusters if c.id == topic.cluster_id), "text": "Keep it", "from_transcript": False},
+        {"id": "d3", "topic_id": None, "topic": None, "text": "Ship it", "from_transcript": False},
     ]
     assert [row["id"] for row in body["actions"]] == ["a1", "a2", "a3"]
     assert body["actions"][0]["owner"] == "Bob"
@@ -96,6 +96,70 @@ async def test_summary_full_shape_order_resolution_and_participation(
     anonymous = next(row for row in body["feedback_cards"] if row["is_anonymous"])
     assert anonymous["author_id"] is None
     assert anonymous["text"] == "Secret"
+
+
+@pytest.mark.asyncio
+async def test_summary_marks_what_a_confirmed_draft_created(
+    client, auth_headers, discussion_retro
+):
+    """A confirmed draft (#10) is a decision like any other, but it says so.
+
+    Without the mark, a facilitator who has just applied a review cannot tell
+    their extraction landed — the entries read exactly like the typed ones. The
+    link is `created_id`, so a draft still pending, one rejected, and a
+    suggestion block that was never written all have to leave the flag alone.
+    """
+    retro = await Retrospective.get(discussion_retro["retro"]["id"])
+    retro.decisions = [
+        Decision(id="d1", text="From the meeting", is_confirmed=True),
+        Decision(id="d2", text="Typed by hand", is_confirmed=True),
+    ]
+    retro.actions = [
+        Action(id="a1", description="From the meeting"),
+        Action(id="a2", description="Typed by hand"),
+    ]
+    retro.ai_suggestions = {
+        "status": "ready",
+        "error": None,
+        "decisions": [
+            {"id": "sd1", "text": "From the meeting", "state": "confirmed", "created_id": "d1"},
+            {"id": "sd2", "text": "Never applied", "state": "pending", "created_id": None},
+        ],
+        "actions": [
+            {"id": "sa1", "description": "From the meeting", "state": "confirmed", "created_id": "a1"},
+            {"id": "sa2", "description": "Turned down", "state": "rejected", "created_id": None},
+        ],
+    }
+    await retro.save()
+
+    body = (await _get(client, str(retro.id), auth_headers)).json()
+    assert {row["id"]: row["from_transcript"] for row in body["decisions"]} == {
+        "d1": True,
+        "d2": False,
+    }
+    assert {row["id"]: row["from_transcript"] for row in body["actions"]} == {
+        "a1": True,
+        "a2": False,
+    }
+
+
+@pytest.mark.asyncio
+async def test_summary_survives_a_retro_that_never_ran_an_extraction(
+    client, auth_headers, discussion_retro
+):
+    """`ai_suggestions` is an untyped dict, so the marks read defensively.
+
+    A retro that never ran an extraction and one whose drafts were deleted with
+    the transcript (#25) both come through here. Losing the marks is cosmetic;
+    failing the whole summary because a dict was shaped oddly is not.
+    """
+    retro = await Retrospective.get(discussion_retro["retro"]["id"])
+    retro.decisions = [Decision(id="d1", text="Ship it", is_confirmed=True)]
+    for drafts in (None, {}, {"status": "processing", "decisions": None, "actions": None}):
+        retro.ai_suggestions = drafts
+        await retro.save()
+        body = (await _get(client, str(retro.id), auth_headers)).json()
+        assert body["decisions"][0]["from_transcript"] is False, drafts
 
 
 @pytest.mark.asyncio
