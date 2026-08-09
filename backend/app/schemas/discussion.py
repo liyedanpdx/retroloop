@@ -123,5 +123,8 @@ class ActionResponse(BaseModel):
     description: str
     owner_id: str | None
     owner_name: str | None = None
+    # `unassigned` | `assigned` | `orphaned` (#23). Derived from the current
+    # member list on every read; nothing about it is stored on the action.
+    owner_state: str
     status: str
     due_date: datetime | None

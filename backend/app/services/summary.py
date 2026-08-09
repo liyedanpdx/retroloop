@@ -11,7 +11,7 @@ from app.schemas.summary import (
     SummaryTopic,
 )
 from app.services.access import load_cycle
-from app.services.discussion import topic_name
+from app.services.discussion import owner_state, topic_name
 from app.services.votes import members_voted
 
 
@@ -74,6 +74,7 @@ async def assemble_summary(retro: Retrospective, project: Project) -> SummaryRes
                     owners.get(action.owner_id)
                     or ((action.owner_name or "").strip() or None)
                 ),
+                owner_state=owner_state(action, project),
                 due_date=action.due_date,
                 status=action.status,
             )

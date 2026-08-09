@@ -12,14 +12,15 @@ from app.services.access import (
     get_retro_for_member,
     require_cycle_open,
 )
-from app.services.discussion import create_topics, topic_to_dict
+from app.models.project import Project
+from app.services.discussion import create_topics, owner_state, topic_to_dict
 from app.services.realtime import broadcast
 from app.services.votes import load_project_for_retro
 
 router = APIRouter(prefix="/api", tags=["retros"])
 
 
-def _to_response(retro: Retrospective, is_facilitator: bool = True) -> RetroResponse:
+def _to_response(retro: Retrospective, project: Project, is_facilitator: bool = True) -> RetroResponse:
     """The retro as a caller is allowed to see it.
 
     `is_facilitator` defaults to True because the two facilitator-only handlers
@@ -40,7 +41,13 @@ def _to_response(retro: Retrospective, is_facilitator: bool = True) -> RetroResp
         # stored on the topic (#9). #11 and #16 read it off this payload.
         topics=[topic_to_dict(retro, t) for t in retro.topics],
         decisions=[d.model_dump(mode="json") for d in retro.decisions],
-        actions=[a.model_dump(mode="json") for a in retro.actions],
+        # Each action says whether its owner is still on the team (#23): an
+        # action left behind by somebody who has gone must not render like one
+        # that is still going to happen.
+        actions=[
+            {**a.model_dump(mode="json"), "owner_state": owner_state(a, project)}
+            for a in retro.actions
+        ],
         # Both are the facilitator's, and this is where that has to be true
         # (#26). #10 made `GET /suggestions` facilitator-only; leaving the same
         # bytes on a payload every member can fetch would have made that a
@@ -79,14 +86,14 @@ async def start_retro(cycle_id: str, user: User = Depends(get_current_user)):
     cycle.status = RETRO
     await cycle.save()
 
-    return _to_response(retro)
+    return _to_response(retro, await load_project_for_retro(retro))
 
 
 @router.get("/retros/{retro_id}", response_model=RetroResponse)
 async def get_retro(retro_id: str, user: User = Depends(get_current_user)):
     retro = await get_retro_for_member(retro_id, user)
     project = await load_project_for_retro(retro)
-    return _to_response(retro, project.is_facilitator(user.id))
+    return _to_response(retro, project, project.is_facilitator(user.id))
 
 
 @router.patch("/retros/{retro_id}/phase", response_model=RetroResponse)
@@ -130,4 +137,4 @@ async def update_phase(
         await broadcast(room, "voting_closed", vote_results(retro, project).model_dump(mode="json"))
     await broadcast(room, "phase_changed", {"phase": allowed})
 
-    return _to_response(retro)
+    return _to_response(retro, await load_project_for_retro(retro))

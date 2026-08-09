@@ -46,7 +46,7 @@ from app.services.access import (
     get_retro_for_member,
     require_writable_phase,
 )
-from app.services.discussion import topic_name
+from app.services.discussion import owner_state, topic_name
 from app.services.realtime import broadcast
 from app.services.votes import load_project_for_retro
 
@@ -142,13 +142,20 @@ def _decision_response(decision: Decision) -> DecisionResponse:
     )
 
 
-def _action_response(action: Action) -> ActionResponse:
+def _action_response(action: Action, project: Project) -> ActionResponse:
+    """The project is required rather than optional, on purpose (#23).
+
+    `owner_state` cannot be computed without it, and an action response that
+    sometimes carries the field and sometimes does not is the defect #10 spent
+    a whole round trip removing from `owner_name`.
+    """
     return ActionResponse(
         id=action.id,
         topic_id=action.topic_id,
         description=action.description,
         owner_id=None if action.owner_id is None else str(action.owner_id),
         owner_name=action.owner_name,
+        owner_state=owner_state(action, project),
         status=action.status,
         due_date=action.due_date,
     )
@@ -283,7 +290,7 @@ async def create_action(
     )
     retro.actions.append(action)
     await retro.save()
-    return _action_response(action)
+    return _action_response(action, await load_project_for_retro(retro))
 
 
 @router.patch("/retros/{retro_id}/actions/{action_id}", response_model=ActionResponse)
@@ -341,7 +348,7 @@ async def update_action(
         action.due_date = body.due_date
 
     await retro.save()
-    return _action_response(action)
+    return _action_response(action, project)
 
 
 @router.delete("/retros/{retro_id}/actions/{action_id}", status_code=status.HTTP_204_NO_CONTENT)

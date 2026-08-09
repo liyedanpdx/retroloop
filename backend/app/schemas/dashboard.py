@@ -79,6 +79,9 @@ class OpenAction(BaseModel):
     description: str
     owner_id: str | None
     owner: str | None
+    # `unassigned` | `assigned` | `orphaned` (#23) — the facilitator's list of
+    # things to reassign is this list, filtered.
+    owner_state: str
     due_date: datetime | None
     status: str
 

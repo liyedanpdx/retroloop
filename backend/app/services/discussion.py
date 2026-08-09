@@ -59,3 +59,29 @@ def topic_to_dict(retro: Retrospective, topic: Topic) -> dict:
     data = topic.model_dump(mode="json")
     data["name"] = topic_name(retro, topic)
     return data
+
+
+# --- who owns an action, and whether they are still here ----------------------
+
+UNASSIGNED = "unassigned"
+ASSIGNED = "assigned"
+ORPHANED = "orphaned"
+
+
+def owner_state(action, project) -> str:
+    """`unassigned`, `assigned`, or `orphaned` (#23).
+
+    #9 decided the storage question and does not reopen it here: an action
+    whose owner leaves the project keeps its `owner_id`, is not reassigned and
+    is not deleted, because rewriting history would destroy the record of what
+    the team agreed. What #9 does not do is *say* so, and an orphaned action
+    renders exactly like one somebody is still going to do.
+
+    Three states rather than a boolean, because #10's best-effort matching
+    already produces actions with no owner at all, and "nobody was assigned"
+    and "the person assigned has left" are different problems for a facilitator
+    to act on.
+    """
+    if action.owner_id is None:
+        return UNASSIGNED
+    return ASSIGNED if project.is_member(action.owner_id) else ORPHANED

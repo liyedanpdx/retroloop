@@ -14,6 +14,7 @@ from app.models.cycle import ACTIVE_STATUSES, Cycle
 from app.models.project import Project
 from app.models.retro import Retrospective
 from app.models.user import User
+from app.services.discussion import owner_state
 from app.schemas.dashboard import (
     DashboardCycle,
     DashboardMember,
@@ -123,6 +124,7 @@ async def assemble_dashboard(project: Project) -> DashboardResponse:
             description=action.description,
             owner_id=None if action.owner_id is None else str(action.owner_id),
             owner=_owner_name(action, owners),
+            owner_state=owner_state(action, project),
             due_date=action.due_date,
             status=action.status,
         )

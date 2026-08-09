@@ -27,6 +27,10 @@ class SummaryAction(BaseModel):
     description: str
     owner_id: str | None
     owner: str | None
+    # `unassigned` | `assigned` | `orphaned` (#23). A published summary still
+    # says which, because a commitment nobody is left to keep is exactly the
+    # thing a team needs to notice when they read it back.
+    owner_state: str
     due_date: datetime | None
     status: str
 
