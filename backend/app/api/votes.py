@@ -12,6 +12,7 @@ from app.schemas.vote import (
 )
 from app.services import votes as vote_service
 from app.services.access import get_retro_for_member, require_writable_phase
+from app.services.realtime import broadcast
 
 router = APIRouter(prefix="/api", tags=["votes"])
 
@@ -90,6 +91,10 @@ async def submit_votes(
     ballot = Vote(user_id=user.id, cluster_ids=list(body.cluster_ids))
     retro.votes.append(ballot)
     await retro.save()
+
+    # Who voted, never what they chose (#29). The room needs the participation
+    # count to move; handing it the ids would undo #8 in one line.
+    await broadcast(str(retro.id), "vote_submitted", {"user_id": str(user.id)})
     return _to_response(ballot)
 
 

@@ -274,6 +274,24 @@ a query parameter. Standard practice for WebSocket auth.
 REST endpoints call a `broadcast(retro_id, event, data)` helper after
 successful mutations. Keeps WebSocket logic decoupled from the REST layer.
 
+### The seven events #12 deferred, and the one family that has none (issue #29)
+`vote_submitted` with `{user_id}` and nothing else; `decision_created`,
+`decision_updated`, `decision_deleted`; `action_created`, `action_updated`,
+`action_deleted`. Create and update carry the same response body their REST
+call returns, so a client merges them by id exactly as it does #12's; delete
+carries `{id}`.
+
+`vote_submitted` deliberately carries no cluster ids. The room needs the
+participation count to move, and handing it the choices would undo #8 in one
+line.
+
+**Feedback cards get no events, and cannot.** A card can only be created,
+edited or deleted while the cycle is `collecting`, and a retrospective — and
+therefore a room — does not exist until reveal. Once it does, #6 freezes the
+cards. There is no window in which a feedback mutation has a room to broadcast
+to, so the "feedback" half of this issue is answered by the phase model rather
+than by an event. Moving a card between clusters is already #12's `card_moved`.
+
 ### No event replay on reconnect (issue #12)
 Missed events are not replayed. The client does a full state fetch via
 GET /api/retros/{id} on reconnect. Simpler and more reliable than event

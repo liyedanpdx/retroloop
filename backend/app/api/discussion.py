@@ -215,7 +215,10 @@ async def create_decision(
     decision = Decision(id=str(uuid4()), topic_id=body.topic_id, text=body.text)
     retro.decisions.append(decision)
     await retro.save()
-    return _decision_response(decision)
+
+    response = _decision_response(decision)
+    await broadcast(str(retro.id), "decision_created", response.model_dump(mode="json"))
+    return response
 
 
 @router.patch("/retros/{retro_id}/decisions/{decision_id}", response_model=DecisionResponse)
@@ -243,7 +246,10 @@ async def update_decision(
         decision.is_confirmed = body.is_confirmed
 
     await retro.save()
-    return _decision_response(decision)
+
+    response = _decision_response(decision)
+    await broadcast(str(retro.id), "decision_updated", response.model_dump(mode="json"))
+    return response
 
 
 @router.delete(
@@ -258,6 +264,8 @@ async def delete_decision(
 
     retro.decisions = [d for d in retro.decisions if d.id != decision_id]
     await retro.save()
+
+    await broadcast(str(retro.id), "decision_deleted", {"id": decision_id})
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -290,7 +298,10 @@ async def create_action(
     )
     retro.actions.append(action)
     await retro.save()
-    return _action_response(action, await load_project_for_retro(retro))
+
+    response = _action_response(action, await load_project_for_retro(retro))
+    await broadcast(str(retro.id), "action_created", response.model_dump(mode="json"))
+    return response
 
 
 @router.patch("/retros/{retro_id}/actions/{action_id}", response_model=ActionResponse)
@@ -348,7 +359,10 @@ async def update_action(
         action.due_date = body.due_date
 
     await retro.save()
-    return _action_response(action, project)
+
+    response = _action_response(action, project)
+    await broadcast(str(retro.id), "action_updated", response.model_dump(mode="json"))
+    return response
 
 
 @router.delete("/retros/{retro_id}/actions/{action_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -359,4 +373,6 @@ async def delete_action(retro_id: str, action_id: str, user: User = Depends(get_
 
     retro.actions = [a for a in retro.actions if a.id != action_id]
     await retro.save()
+
+    await broadcast(str(retro.id), "action_deleted", {"id": action_id})
     return Response(status_code=status.HTTP_204_NO_CONTENT)
