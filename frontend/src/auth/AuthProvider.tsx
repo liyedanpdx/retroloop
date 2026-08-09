@@ -59,8 +59,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [status, setStatus] = useState<AuthStatus>("loading");
   const navigate = useNavigate();
-  // StrictMode runs effects twice in development. Bootstrapping twice would
-  // send two refreshes for one page load, so the guard is not optional.
+  // StrictMode mounts, unmounts and mounts again in development, so without a
+  // guard one page load sends two refreshes. The guard is a ref rather than
+  // state because it has to survive that remount — which is also why the effect
+  // below must not throw its result away on cleanup: the "unmount" is a
+  // simulation, the ref remembers it already ran, and a discarded result would
+  // leave the status on `loading` forever.
   const bootstrapped = useRef(false);
 
   useEffect(() => {
@@ -77,32 +81,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     bootstrapped.current = true;
 
-    let cancelled = false;
-    (async () => {
+    // 没有 cancelled 标记,故意的。这个 effect 一次页面加载只跑一次,由上面的
+    // ref 保证;在卸载时丢弃它的结果,只会在 StrictMode 下把状态永远钉在
+    // `loading`。真正卸载之后 setState 是无害的 no-op。
+    void (async () => {
       const token = getAccessToken() ?? (await refreshAccessToken());
       if (!token) {
-        if (!cancelled) {
-          setStatus("anonymous");
-        }
+        setStatus("anonymous");
         return;
       }
       try {
         const me = await api.get<User>("/api/auth/me");
-        if (!cancelled) {
-          setUser(me.data);
-          setStatus("authenticated");
-        }
+        setUser(me.data);
+        setStatus("authenticated");
       } catch {
         setAccessToken(null);
-        if (!cancelled) {
-          setStatus("anonymous");
-        }
+        setStatus("anonymous");
       }
     })();
-
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {

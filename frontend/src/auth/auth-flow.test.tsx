@@ -6,6 +6,8 @@
  * called. HTTP is the fake adapter from `test-utils/http`, which leaves the real
  * clients and interceptors in place.
  */
+import { StrictMode } from "react";
+
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -38,6 +40,45 @@ beforeEach(() => {
 });
 
 // --- bootstrap ---------------------------------------------------------------
+
+describe("under StrictMode, which is how main.tsx actually mounts it", () => {
+  /**
+   * 这一组存在的原因是它抓到了一个真实的挂死。
+   *
+   * StrictMode 会 mount → unmount → mount。守卫用的 ref 会挺过那次假卸载,
+   * 所以第二次挂载什么都不做;而如果第一次挂载的结果在 cleanup 里被丢掉,
+   * 状态就永远停在 `loading`,页面永远显示「Restoring your session…」。
+   *
+   * 其余的测试都不用 StrictMode 渲染,所以全都看不到它 —— 而 `main.tsx` 用。
+   */
+  function renderStrict(path: string, routes: Record<string, Handler | Reply>) {
+    const calls = installHttp(routes);
+    render(
+      <StrictMode>
+        <MemoryRouter initialEntries={[path]}>
+          <AppRoutes />
+        </MemoryRouter>
+      </StrictMode>
+    );
+    return calls;
+  }
+
+  it("settles on the login page instead of restoring for ever", async () => {
+    renderStrict("/projects", NO_SESSION);
+
+    expect(
+      await screen.findByRole("heading", { name: "Log in to RetroLoop" })
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Restoring your session/)).not.toBeInTheDocument();
+  });
+
+  it("still restores a live session, and still refreshes only once", async () => {
+    const calls = renderStrict("/projects", LIVE_SESSION);
+
+    expect(await screen.findByRole("heading", { name: "Projects" })).toBeInTheDocument();
+    expect(callsTo(calls, "POST", "/api/auth/refresh")).toHaveLength(1);
+  });
+});
 
 describe("starting the app", () => {
   it("shows a loading state, then the protected page after a silent refresh", async () => {
