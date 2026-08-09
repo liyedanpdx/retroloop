@@ -608,7 +608,9 @@ describe("reviewing the drafts", () => {
     );
     await screen.findByRole("heading", { name: "Review the drafts" });
 
-    expect(screen.getByText(/kept as d1/)).toBeInTheDocument();
+    // 内部 id 不再出现在界面上 —— 它对读的人没有任何意义。
+    expect(screen.getByText("kept")).toBeInTheDocument();
+    expect(screen.queryByText(/d1/)).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Decision text")).not.toBeInTheDocument();
   });
 

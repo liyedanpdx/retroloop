@@ -351,8 +351,9 @@ export function TranscriptPage() {
           {deleting && (
             <div role="dialog" aria-modal="true" aria-label="Delete the stored transcript">
               <p>
-                删掉存下来的会议原文和它派生的草稿。已经确认过的决定和行动会
-                留下 —— 那是这次回顾自己的记录。这一步没法撤销。
+                Delete the stored meeting text and the drafts taken from it.
+                Decisions and actions you already kept stay — those are the
+                retrospective’s own record. This cannot be undone.
               </p>
               <button
                 type="button"
@@ -441,6 +442,9 @@ function Review({
   );
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  // 这一轮的结果。留着是为了在应用之后能说清楚发生了什么 —— 页面自己刷新完
+  // 长得几乎一样,不说的话没人知道刚才那一下做成了没有。
+  const [applied, setApplied] = useState<{ kept: number; rejected: number } | null>(null);
 
   const unconfirmed = (state: string) => state !== "confirmed";
   const chosenDecisions = suggestions.decisions.filter(
@@ -491,6 +495,10 @@ function Review({
     setError(null);
     try {
       await confirmSuggestions(retroId, body);
+      setApplied({
+        kept: body.decisions.length + body.actions.length,
+        rejected: body.rejected.length,
+      });
       await onApplied();
     } catch (failure) {
       const code = isAxiosError(failure) ? failure.response?.status : undefined;
@@ -515,6 +523,25 @@ function Review({
       <h2>Review the drafts</h2>
       {error && <p role="alert">{error}</p>}
 
+      {/* 应用之后页面刷新完长得几乎一样,所以要明说做成了什么、东西去哪了、
+          下一步点哪 —— 否则「Apply」像是什么都没发生。 */}
+      {applied && (
+        <div role="status" className="panel space-y-2">
+          <p>
+            Kept {applied.kept} {applied.kept === 1 ? "item" : "items"}
+            {applied.rejected > 0
+              ? ` and rejected ${applied.rejected}`
+              : ""}
+            . What you kept is now part of the retrospective — you will find it
+            under Decisions and Actions.
+          </p>
+          <p className="flex flex-wrap gap-4">
+            <Link to={`/retros/${retroId}`}>Back to the retrospective</Link>
+            <Link to={`/retros/${retroId}/summary`}>Preview the summary</Link>
+          </p>
+        </div>
+      )}
+
       <h3 className="font-semibold">Decisions</h3>
       {suggestions.decisions.length === 0 ? (
         <p className="empty">No decisions were extracted</p>
@@ -524,7 +551,7 @@ function Review({
             <li key={row.id} className="card">
               {row.state === "confirmed" ? (
                 <p>
-                  {row.text} — kept as {row.created_id}
+                  {row.text} <span className="badge badge-accent">kept</span>
                 </p>
               ) : (
                 <>
@@ -566,7 +593,7 @@ function Review({
             <li key={row.id} className="card">
               {row.state === "confirmed" ? (
                 <p>
-                  {row.description} — kept as {row.created_id}
+                  {row.description} <span className="badge badge-accent">kept</span>
                 </p>
               ) : (
                 <>

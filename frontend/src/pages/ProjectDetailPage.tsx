@@ -382,7 +382,7 @@ function CycleLifecycle({
     const status = isAxiosError(failure) ? failure.response?.status : undefined;
     setError(
       status === 409
-        ? "这个项目已经有一个进行中的周期了。"
+        ? "This project already has an open cycle."
         : status === 403
           ? PERMISSION_CHANGED
           : status === 400
@@ -414,7 +414,7 @@ function CycleLifecycle({
               .finally(() => setPending(false));
           }}
         >
-          {pending ? "开启中…" : "Start a feedback cycle"}
+          {pending ? "Opening…" : "Start a feedback cycle"}
         </button>
         {error && <p role="alert">{error}</p>}
       </div>
@@ -430,7 +430,7 @@ function CycleLifecycle({
           className="btn btn-primary"
           onClick={() => setConfirming(true)}
         >
-          {pending ? "开启中…" : "Start the retrospective"}
+          {pending ? "Starting…" : "Start the retrospective"}
         </button>
       )}
 
@@ -447,9 +447,11 @@ function CycleLifecycle({
       {closing && (
         <div role="dialog" aria-modal="true" aria-label="Close this cycle">
           <p>
-            关闭这个周期?之后谁也不能再往里写反馈
-            {cycle.status === "collecting" ? ",而且它不会再变成一次回顾" : ""}
-            。这一步没法撤销。
+            Close this cycle? Nobody will be able to add feedback to it
+            {cycle.status === "collecting"
+              ? ", and it will never become a retrospective"
+              : ""}
+            . This cannot be undone.
           </p>
           <button
             type="button"
@@ -476,8 +478,9 @@ function CycleLifecycle({
       {confirming && (
         <div role="dialog" aria-modal="true" aria-label="Start the retrospective">
           <p>
-            开始回顾会把每个人的卡片揭示给全组,并且从此冻结 —— 没人能再改或者
-            删自己的卡。没有办法退回收集阶段。
+            Starting the retrospective reveals everyone’s cards to the whole
+            team and freezes them — nobody can edit or delete their own after
+            this. There is no way back to collecting.
           </p>
           <button
             type="button"

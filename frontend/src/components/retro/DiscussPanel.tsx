@@ -717,8 +717,8 @@ function TopicShape({
       {confirming && (
         <div role="dialog" aria-modal="true" aria-label={`Remove ${topic.name}`}>
           <p>
-            把这个议题从议程上拿掉?挂在它下面的决定和行动不会被删,它们会变成
-            Unlinked。
+            Take this topic off the agenda? The decisions and actions under it
+            are not deleted — they become Unlinked.
           </p>
           <button
             type="button"

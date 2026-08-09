@@ -290,7 +290,7 @@ describe("the cycle lifecycle", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Start a feedback cycle" }));
 
-    expect(await screen.findByText(/已经有一个进行中的周期/)).toBeInTheDocument();
+    expect(await screen.findByText(/already has an open cycle/)).toBeInTheDocument();
     await waitFor(() =>
       expect(callsTo(calls, "GET", "/api/projects/p1/dashboard").length).toBeGreaterThan(before)
     );
@@ -319,8 +319,8 @@ describe("the cycle lifecycle", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Start the retrospective" }));
     const dialog = await screen.findByRole("dialog", { name: "Start the retrospective" });
-    expect(within(dialog).getByText(/从此冻结/)).toBeInTheDocument();
-    expect(within(dialog).getByText(/没有办法退回收集阶段/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/freezes them/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/no way back to collecting/)).toBeInTheDocument();
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
