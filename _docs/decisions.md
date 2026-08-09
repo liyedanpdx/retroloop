@@ -41,6 +41,18 @@ When any API call returns 401, the interceptor tries POST /api/auth/refresh
 once. If refresh succeeds, the original request is retried. If refresh fails,
 redirect to /login. Auth logic stays out of individual components.
 
+### The frontend talks to a same-origin `/api` (issue #13)
+Every request in `src/api` is a relative path. `frontend/nginx.conf` already
+proxies `/api/` to the backend in the built image, and the Vite dev server now
+proxies it the same way, so the refresh cookie is first-party in development and
+in production without a second configuration to keep in step.
+
+### `axios` and `react-router-dom`, and nothing else (issue #13)
+The two runtime dependencies the issue authorises. `@testing-library/user-event`
+was tried for the form tests and removed again: `fireEvent`, already present, is
+enough, and a test-only convenience is not worth a dependency `AGENTS.md`
+requires approval for.
+
 ## Feedback
 
 ### Anonymous cards cannot be edited or deleted (issue #5)

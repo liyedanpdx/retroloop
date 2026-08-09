@@ -1,8 +1,46 @@
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+
+import { AuthProvider } from "./auth/AuthProvider";
+import { ProtectedRoute, PublicOnlyRoute } from "./auth/routes";
+import { ProtectedLayout } from "./components/ProtectedLayout";
+import { LoginPage } from "./pages/LoginPage";
+import { ProjectsPage } from "./pages/ProjectsPage";
+import { RegisterPage } from "./pages/RegisterPage";
+
+/**
+ * The routes, and the one place `AuthProvider` is mounted (#13).
+ *
+ * The provider sits inside the router rather than around it, because losing a
+ * session has to end in a navigation and only a component under a router can
+ * make one.
+ */
+export function AppRoutes() {
+  return (
+    <AuthProvider>
+      <Routes>
+        <Route element={<PublicOnlyRoute />}>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+        </Route>
+
+        <Route element={<ProtectedRoute />}>
+          <Route element={<ProtectedLayout />}>
+            <Route path="/projects" element={<ProjectsPage />} />
+          </Route>
+        </Route>
+
+        {/* Anything else: the guards decide where it lands. */}
+        <Route path="*" element={<Navigate to="/projects" replace />} />
+      </Routes>
+    </AuthProvider>
+  );
+}
+
 function App() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <h1 className="text-3xl font-bold text-gray-900">RetroLoop</h1>
-    </div>
+    <BrowserRouter>
+      <AppRoutes />
+    </BrowserRouter>
   );
 }
 
