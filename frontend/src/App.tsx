@@ -4,6 +4,7 @@ import { AuthProvider } from "./auth/AuthProvider";
 import { ProtectedRoute, PublicOnlyRoute } from "./auth/routes";
 import { ProtectedLayout } from "./components/ProtectedLayout";
 import { LoginPage } from "./pages/LoginPage";
+import { ProjectDetailPage } from "./pages/ProjectDetailPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
 import { RegisterPage } from "./pages/RegisterPage";
 
@@ -26,6 +27,7 @@ export function AppRoutes() {
         <Route element={<ProtectedRoute />}>
           <Route element={<ProtectedLayout />}>
             <Route path="/projects" element={<ProjectsPage />} />
+            <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
           </Route>
         </Route>
 
