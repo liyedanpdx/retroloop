@@ -307,6 +307,33 @@ A card's category is set on creation and cannot be changed by dragging.
 Delete and recreate to recategorize. Avoids confusion with retro board
 clustering drag.
 
+### Projects are archived, never deleted (issue #32)
+`PATCH /api/projects/{id}/archive` with `{"archived": true|false}`, facilitator
+only, reversible, idempotent both ways. There is no delete endpoint and no
+cascade: a project's cycles, retrospectives, feedback and actions are the record
+of what a team did, and nothing in this product destroys that. #32's own
+constraint says not to build cascading deletion until retention and recovery are
+decided, and archiving is what makes that decision unnecessary rather than
+deferred.
+
+Archiving requires no active cycle, `400` otherwise. That is what makes
+"archived" mean something: with nothing in flight, the read-only rule is one
+guard on the project's own write endpoints plus one on starting a new cycle,
+rather than a check scattered through every feedback and retro path.
+
+An archived project is read-only for everyone — rename, member add, member
+remove, role change and new cycles all `400` — and readable by exactly whoever
+could read it before.
+
+### A project always has a facilitator (issue #32)
+`PATCH /api/projects/{id}/members/{user_id}` with `{"role": ...}` promotes and
+demotes, and any facilitator may use it, including on themselves. Demoting the
+last facilitator is `400`: there is no administrator above a project to repair
+one nobody can run, and its cycles could never be closed again.
+
+Self-demotion is allowed once somebody else is a facilitator, so handing over
+and stepping back does not need a third person.
+
 ### No project edit/delete in MVP (issue #14)
 Projects can be created and members managed, but no rename or delete. Keeps
 scope small.

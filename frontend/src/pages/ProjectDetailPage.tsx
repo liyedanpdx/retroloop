@@ -9,6 +9,9 @@ import {
   getProject,
   removeMember,
   roleIn,
+  setArchived,
+  updateMemberRole,
+  updateProject,
   type Dashboard,
   type DashboardMember,
   type Project,
@@ -82,7 +85,10 @@ export function ProjectDetailPage() {
 
   const { project, dashboard } = state;
   const role = roleIn(project, user?.id);
-  const isFacilitator = role === FACILITATOR && !demoted;
+  const archived = Boolean(project.archived_at);
+  // An archived project is read-only for everyone (#32), so the controls go
+  // rather than failing when pressed.
+  const isFacilitator = role === FACILITATOR && !demoted && !archived;
   const cycle = dashboard.current_cycle;
 
   return (
@@ -91,8 +97,13 @@ export function ProjectDetailPage() {
         <h1 className="text-2xl font-bold text-gray-900 break-words">{project.name}</h1>
         {project.description && <p className="break-words">{project.description}</p>}
         <p>{role ? `You are ${role === FACILITATOR ? "a facilitator" : "a member"}` : ""}</p>
+        {archived && <p role="status">This project is archived. It is read-only.</p>}
         {demoted && <p role="alert">{PERMISSION_CHANGED}</p>}
       </header>
+
+      {role === FACILITATOR && !demoted && (
+        <Settings project={project} archived={archived} onChanged={load} />
+      )}
 
       <section className="space-y-2">
         <h2 className="text-xl font-semibold">Current cycle</h2>
@@ -173,6 +184,162 @@ export function ProjectDetailPage() {
   );
 }
 
+/**
+ * Rename, and archive or restore (#32).
+ *
+ * Archiving is the only "remove a project" this product has, and it is
+ * reversible on purpose: cycles, retrospectives, feedback and actions are the
+ * record of what a team did, and no button here destroys that. The confirmation
+ * says as much, so nobody is looking for an undo that does not exist.
+ */
+function Settings({
+  project,
+  archived,
+  onChanged,
+}: {
+  project: Project;
+  archived: boolean;
+  onChanged: () => Promise<void>;
+}) {
+  const [name, setName] = useState(project.name);
+  const [description, setDescription] = useState(project.description ?? "");
+  const [fieldError, setFieldError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+
+  async function run(action: () => Promise<void>) {
+    if (pending) {
+      return;
+    }
+    setPending(true);
+    setError(null);
+    try {
+      await action();
+      await onChanged();
+    } catch (failure) {
+      const status = isAxiosError(failure) ? failure.response?.status : undefined;
+      setError(
+        status === 400
+          ? "That is not possible in the project's current state."
+          : status === 403
+            ? PERMISSION_CHANGED
+            : GENERIC_FAILURE
+      );
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <section className="space-y-3 rounded border p-4">
+      <h2 className="text-xl font-semibold">Project settings</h2>
+
+      {!archived && (
+        <form
+          noValidate
+          className="max-w-md space-y-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const trimmed = name.trim();
+            if (!trimmed) {
+              setFieldError("Project name is required");
+              return;
+            }
+            setFieldError(null);
+            void run(async () => {
+              await updateProject(project.id, {
+                name: trimmed,
+                description: description.trim() || null,
+              });
+            });
+          }}
+        >
+          <div>
+            <label htmlFor="settings-name">Project name</label>
+            <input
+              id="settings-name"
+              value={name}
+              disabled={pending}
+              onChange={(event) => setName(event.target.value)}
+              aria-invalid={fieldError ? true : undefined}
+              aria-describedby={fieldError ? "settings-name-error" : undefined}
+              className="w-full rounded border px-3 py-2"
+            />
+            {fieldError && (
+              <p id="settings-name-error" role="alert">
+                {fieldError}
+              </p>
+            )}
+          </div>
+          <div>
+            <label htmlFor="settings-description">Description</label>
+            <textarea
+              id="settings-description"
+              value={description}
+              disabled={pending}
+              onChange={(event) => setDescription(event.target.value)}
+              className="w-full rounded border px-3 py-2"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={pending}
+            className="rounded bg-gray-900 px-4 py-2 text-white disabled:opacity-50"
+          >
+            {pending ? "Saving…" : "Save project details"}
+          </button>
+        </form>
+      )}
+
+      {error && <p role="alert">{error}</p>}
+
+      {archived ? (
+        <button
+          type="button"
+          disabled={pending}
+          className="underline disabled:opacity-50"
+          onClick={() => void run(async () => void (await setArchived(project.id, false)))}
+        >
+          Restore this project
+        </button>
+      ) : (
+        <button
+          type="button"
+          disabled={pending}
+          className="underline disabled:opacity-50"
+          onClick={() => setConfirming(true)}
+        >
+          Archive this project
+        </button>
+      )}
+
+      {confirming && (
+        <div role="dialog" aria-modal="true" aria-label="Archive this project">
+          <p>
+            Archive {project.name}? It becomes read-only and disappears from
+            everyday use. Nothing is deleted — its cycles, retrospectives and
+            feedback stay, and a facilitator can restore it.
+          </p>
+          <button
+            type="button"
+            className="underline"
+            onClick={() => {
+              setConfirming(false);
+              void run(async () => void (await setArchived(project.id, true)));
+            }}
+          >
+            Yes, archive it
+          </button>
+          <button type="button" className="ml-3 underline" onClick={() => setConfirming(false)}>
+            Cancel
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function NotAvailable({ message }: { message: string }) {
   return (
     <div role="alert" className="space-y-2">
@@ -236,6 +403,35 @@ function Members({
     }
   }
 
+  async function onRole(member: DashboardMember, role: string) {
+    setRemoveError(null);
+    setRemovingId(member.user_id);
+    try {
+      await updateMemberRole(projectId, member.user_id, role);
+      await onChanged();
+    } catch (error) {
+      const status = isAxiosError(error) ? error.response?.status : undefined;
+      if (status === 403) {
+        onDemoted();
+        return;
+      }
+      // A 400 here is the one rule the backend will not bend: a project can
+      // never be left without a facilitator.
+      setRemoveError(
+        status === 400
+          ? "A project must always have a facilitator."
+          : status === 404
+            ? "That member is no longer on this project."
+            : GENERIC_FAILURE
+      );
+      if (status === 404) {
+        await onChanged();
+      }
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
   async function onRemove(member: DashboardMember) {
     setConfirming(null);
     setRemoveError(null);
@@ -282,6 +478,23 @@ function Members({
                   {formatDate(member.joined_at, "unknown date")}
                 </p>
               </div>
+              {isFacilitator && (
+                <div>
+                  <label htmlFor={`role-${member.user_id}`}>
+                    Role of {member.display_name}
+                  </label>
+                  <select
+                    id={`role-${member.user_id}`}
+                    value={member.role}
+                    disabled={removingId === member.user_id}
+                    onChange={(event) => void onRole(member, event.target.value)}
+                    className="rounded border px-2 py-1"
+                  >
+                    <option value="member">Member</option>
+                    <option value="facilitator">Facilitator</option>
+                  </select>
+                </div>
+              )}
               {/* No Remove on your own row: the API forbids a facilitator
                   removing themselves, so offering it would only ever fail. */}
               {isFacilitator && member.user_id !== currentUserId && (

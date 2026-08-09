@@ -25,6 +25,8 @@ export type Project = {
   members: ProjectMember[];
   created_at: string;
   created_by: string;
+  /** Non-null once archived (#32). Archiving is reversible; nothing is deleted. */
+  archived_at: string | null;
 };
 
 export type DashboardMember = {
@@ -121,4 +123,23 @@ export function orderProjects(projects: Project[]): Project[] {
 export function roleIn(project: Project, userId: string | undefined): string | null {
   const member = project.members.find((row) => row.user_id === userId);
   return member ? member.role : null;
+}
+
+export async function updateProject(
+  projectId: string,
+  body: { name?: string; description?: string | null }
+): Promise<Project> {
+  return (await api.patch<Project>(`/api/projects/${projectId}`, body)).data;
+}
+
+export async function setArchived(projectId: string, archived: boolean): Promise<Project> {
+  return (await api.patch<Project>(`/api/projects/${projectId}/archive`, { archived })).data;
+}
+
+export async function updateMemberRole(
+  projectId: string,
+  userId: string,
+  role: string
+): Promise<void> {
+  await api.patch(`/api/projects/${projectId}/members/${userId}`, { role });
 }

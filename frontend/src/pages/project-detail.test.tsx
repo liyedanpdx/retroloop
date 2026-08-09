@@ -45,6 +45,7 @@ function projectDoc(role = "facilitator") {
     ],
     created_at: "2026-02-01T00:00:00Z",
     created_by: ALICE.id,
+    archived_at: null,
   };
 }
 
@@ -122,7 +123,7 @@ describe("the dashboard", () => {
     expect(await screen.findByText("Loading this project…")).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "Team Alpha" })).toBeInTheDocument();
 
-    expect(screen.getByText("our retro project")).toBeInTheDocument();
+    expect(screen.getAllByText("our retro project").length).toBeGreaterThan(0);
     expect(screen.getByText(/You are a facilitator/)).toBeInTheDocument();
     expect(screen.getByText("Status: retro")).toBeInTheDocument();
     expect(screen.getByText("1 of 2 members submitted")).toBeInTheDocument();

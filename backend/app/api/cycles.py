@@ -34,6 +34,12 @@ def _to_response(cycle: Cycle) -> CycleResponse:
 )
 async def create_cycle(project_id: str, user: User = Depends(get_current_user)):
     project = await get_project_for_facilitator(project_id, user)
+    if project.is_archived:
+        # Archiving already required no active cycle; this stops a new one
+        # starting afterwards, which is the other half of "read-only" (#32).
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="This project is archived"
+        )
 
     existing = await Cycle.find(
         Cycle.project_id == project.id, {"status": {"$in": list(ACTIVE_STATUSES)}}

@@ -23,9 +23,20 @@ class Project(Document):
     members: list[Member] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=_now)
     created_by: PydanticObjectId
+    # Archived, not deleted (#32). Nothing is cascaded and nothing is destroyed:
+    # a project's cycles, retrospectives, feedback and actions are the record of
+    # what a team did, and deleting them is not reversible by anybody.
+    archived_at: datetime | None = None
 
     class Settings:
         name = "projects"
+
+    @property
+    def is_archived(self) -> bool:
+        return self.archived_at is not None
+
+    def facilitators(self) -> list["Member"]:
+        return [member for member in self.members if member.role == FACILITATOR]
 
     def member_for(self, user_id: PydanticObjectId) -> Member | None:
         for member in self.members:
