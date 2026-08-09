@@ -31,6 +31,7 @@ from app.schemas.transcript import (
     TranscriptAcceptedResponse,
     TranscriptRequest,
 )
+from app.services.ai_budget import consume_ai_budget
 from app.services.concurrency import save_retro
 from app.services.access import get_retro_for_facilitator, require_cycle_open, require_phase
 from app.services.transcript import (
@@ -85,6 +86,7 @@ async def paste_transcript(
     and confirmation is one-way.
     """
     retro = await _writable_retro(retro_id, user)
+    await consume_ai_budget(retro)
 
     if is_processing(retro):
         raise HTTPException(

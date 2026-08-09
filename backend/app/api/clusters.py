@@ -24,6 +24,7 @@ from app.services.access import (
     require_writable_phase,
 )
 from app.services.ai import ProxyError, ProxyMalformedResponse, ProxyTimeout
+from app.services.ai_budget import consume_ai_budget
 from app.services.cluster_suggestions import suggest_clusters
 from app.services.realtime import broadcast
 
@@ -86,6 +87,7 @@ async def suggest_clusters_for_retro(
     """
     retro = await get_retro_for_facilitator(retro_id, user)
     await require_writable_phase(retro, CLUSTER)
+    await consume_ai_budget(retro)
 
     try:
         return await suggest_clusters(retro)

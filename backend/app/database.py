@@ -5,10 +5,11 @@ from app.config import settings
 from app.models.cycle import Cycle
 from app.models.feedback import FeedbackCard
 from app.models.project import Project
+from app.models.rate_limit import RateLimitWindow
 from app.models.retro import Retrospective
 from app.models.user import User
 
-DOCUMENT_MODELS: list = [User, Project, Cycle, FeedbackCard, Retrospective]
+DOCUMENT_MODELS: list = [User, Project, Cycle, FeedbackCard, Retrospective, RateLimitWindow]
 
 # The client the app initialised, kept so readiness can ping the same connection
 # the request path uses rather than opening a second one and proving nothing.

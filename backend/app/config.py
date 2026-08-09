@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     # name, one setting"). This class forbids extra keys, so OPENAI_MODEL in a
     # .env without this field is a startup failure rather than an ignored line.
     openai_model: str = "gpt-5.4"
+    # 限流的两个上限 (#27)。默认值是「挡住失控的重试和脚本,挡不住正常使用」
+    # 的量级,不是精算出来的——真实数字要看代理的账单,而账单还没有。
+    ai_calls_per_hour: int = 30
+    login_attempts_per_15_minutes: int = 20
     jwt_secret: str = "change-me"
     jwt_refresh_secret: str = "change-me-refresh"
     # The refresh cookie's deployment-dependent attributes (#30). The defaults

@@ -1,7 +1,10 @@
+from datetime import timedelta
+
 from beanie.exceptions import RevisionIdWasChanged
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pymongo.errors import DuplicateKeyError
 
+from app.config import settings
 from app.deps import get_current_user
 from app.models.user import User
 from app.schemas.auth import (
@@ -18,6 +21,7 @@ from app.services.auth import (
     hash_password,
     verify_password,
 )
+from app.services.rate_limit import consume
 from app.services.cookies import REFRESH_COOKIE, clear_refresh_cookie, set_refresh_cookie
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -43,6 +47,16 @@ async def login(body: LoginRequest, response: Response):
     the body only to ask the client not to keep it would be a convention rather
     than a boundary.
     """
+    # 密码猜测比 AI 花钱更值得先挡住 (#27)。按邮箱计数,而不是按 IP:
+    # 一个办公室共用一个出口 IP,按 IP 限流会把整个团队一起锁掉,而攻击者换 IP
+    # 比换目标邮箱容易得多。
+    await consume(
+        f"login:{body.email.lower()}",
+        settings.login_attempts_per_15_minutes,
+        timedelta(minutes=15),
+        "Too many sign-in attempts for this account. Try again later.",
+    )
+
     user = await User.find_one(User.email == body.email)
     if user is None or not verify_password(body.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")

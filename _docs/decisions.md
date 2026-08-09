@@ -336,9 +336,55 @@ the same condition, and without this the status would sit at `processing`
 forever while #17's poller spins — the "no falsely active job" the issue asks
 for.
 
+### 限流放在应用里,计数放在数据库里 (issue #27)
+放在应用里而不是网关上,因为要限的是「一个项目一小时能烧多少 AI 预算」——那是
+应用才知道的东西,网关只看得见 IP。计数放在 MongoDB 而不是进程内存里,因为
+进程内的计数器在两个实例下等于没有,而部署形态还没定 (#33);数据库是目前唯一
+一个所有实例都看得见的东西。
+
+固定窗口,一次带 upsert 的原子更新,所以并发请求不会各自读到同一个旧计数。
+超限是 `429` 加 `Retry-After`,`detail` 里不写剩余次数或上限——那正好是让人把
+脚本调到上限之下的信息。
+
+**先挡登录,再挡 AI。** 这个 issue 只提到 AI,但这个项目此前没有任何限流,
+只给最贵的接口加限制、却让 `POST /api/auth/login` 可以被无限次猜密码,是错误的
+优先级。所以两个一起做了:登录按邮箱计数(不是按 IP——一个办公室共用一个出口
+IP,按 IP 会把整个团队一起锁掉,而攻击者换 IP 比换目标容易),AI 按项目计数
+(按 retro 的话,开个新 retro 就能重置额度)。
+
+抽取和聚类建议共用同一个桶,因为它们共用 `app/services/ai.py`,也共用同一份
+账单;只限其中一个只会把开销挪走。
+
+**没有做重试端点。** #10 失败时会保留 transcript,#17 已经把「重新粘贴同一份
+文本」做成了一次点击——一个专用端点会是第二种做法去做一件已经有做法的事,并且
+要把阶段、权限、`409`-while-processing 和关闭周期的处理再抄一遍。
+
 ## Summary
 
-### Summary is assembled on read (issue #11)
+#### 限流放在应用里,计数放在数据库里 (issue #27)
+放在应用里而不是网关上,因为要限的是「一个项目一小时能烧多少 AI 预算」——那是
+应用才知道的东西,网关只看得见 IP。计数放在 MongoDB 而不是进程内存里,因为
+进程内的计数器在两个实例下等于没有,而部署形态还没定 (#33);数据库是目前唯一
+一个所有实例都看得见的东西。
+
+固定窗口,一次带 upsert 的原子更新,所以并发请求不会各自读到同一个旧计数。
+超限是 `429` 加 `Retry-After`,`detail` 里不写剩余次数或上限——那正好是让人把
+脚本调到上限之下的信息。
+
+**先挡登录,再挡 AI。** 这个 issue 只提到 AI,但这个项目此前没有任何限流,
+只给最贵的接口加限制、却让 `POST /api/auth/login` 可以被无限次猜密码,是错误的
+优先级。所以两个一起做了:登录按邮箱计数(不是按 IP——一个办公室共用一个出口
+IP,按 IP 会把整个团队一起锁掉,而攻击者换 IP 比换目标容易),AI 按项目计数
+(按 retro 的话,开个新 retro 就能重置额度)。
+
+抽取和聚类建议共用同一个桶,因为它们共用 `app/services/ai.py`,也共用同一份
+账单;只限其中一个只会把开销挪走。
+
+**没有做重试端点。** #10 失败时会保留 transcript,#17 已经把「重新粘贴同一份
+文本」做成了一次点击——一个专用端点会是第二种做法去做一件已经有做法的事,并且
+要把阶段、权限、`409`-while-processing 和关闭周期的处理再抄一遍。
+
+## Summary is assembled on read (issue #11)
 GET /summary aggregates data from the retro document on each request. No
 separate summary document — keeps data consistent and avoids sync issues.
 
