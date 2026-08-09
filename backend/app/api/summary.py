@@ -7,7 +7,12 @@ from app.models.cycle import CLOSED
 from app.models.retro import DISCUSS, DONE
 from app.models.user import User
 from app.schemas.summary import SummaryResponse
-from app.services.access import get_retro_for_facilitator, get_retro_for_member, load_cycle
+from app.services.access import (
+    get_retro_for_facilitator,
+    get_retro_for_member,
+    load_cycle,
+    require_cycle_open,
+)
 from app.services.summary import assemble_summary
 from app.services.votes import load_project_for_retro
 
@@ -39,6 +44,12 @@ async def publish_summary(retro_id: str, user: User = Depends(get_current_user))
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Only a discussion can be published",
         )
+    # Publishing is the write that closes the cycle, so it checks the cycle is
+    # still open first and is therefore the only command #20 lets through once.
+    # A cycle closed some other way — through PATCH /api/cycles/{id} — leaves a
+    # retro in `discuss` that can no longer be published, which is correct: the
+    # team ended the cycle, and publishing would reopen work on it.
+    await require_cycle_open(retro)
 
     cycle = await load_cycle(str(retro.cycle_id))
     project = await load_project_for_retro(retro)

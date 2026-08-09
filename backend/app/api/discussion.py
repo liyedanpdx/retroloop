@@ -41,7 +41,11 @@ from app.schemas.discussion import (
     UpdateDecisionRequest,
     UpdateTopicRequest,
 )
-from app.services.access import get_retro_for_facilitator, get_retro_for_member, require_phase
+from app.services.access import (
+    get_retro_for_facilitator,
+    get_retro_for_member,
+    require_writable_phase,
+)
 from app.services.discussion import topic_name
 from app.services.realtime import broadcast
 from app.services.votes import load_project_for_retro
@@ -110,7 +114,7 @@ async def _require_current_member(retro: Retrospective, owner_id: PydanticObject
 async def _facilitator_retro(retro_id: str, user: User) -> Retrospective:
     """Membership and role first, then phase — the id lookup is the caller's next step."""
     retro = await get_retro_for_facilitator(retro_id, user)
-    require_phase(retro, DISCUSS)
+    await require_writable_phase(retro, DISCUSS)
     return retro
 
 
@@ -302,7 +306,7 @@ async def update_action(
     facilitator rights.
     """
     retro = await get_retro_for_member(retro_id, user)
-    require_phase(retro, DISCUSS)
+    await require_writable_phase(retro, DISCUSS)
     action = _find_action(retro, action_id)
 
     project: Project = await load_project_for_retro(retro)

@@ -11,7 +11,7 @@ from app.schemas.vote import (
     VoteResultsResponse,
 )
 from app.services import votes as vote_service
-from app.services.access import get_retro_for_member, require_phase
+from app.services.access import get_retro_for_member, require_writable_phase
 
 router = APIRouter(prefix="/api", tags=["votes"])
 
@@ -77,7 +77,7 @@ async def submit_votes(
     sees their own choices back.
     """
     retro = await get_retro_for_member(retro_id, user)
-    require_phase(retro, VOTE)
+    await require_writable_phase(retro, VOTE)
 
     if vote_service.has_voted(retro, user.id):
         raise HTTPException(

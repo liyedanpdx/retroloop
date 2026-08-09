@@ -20,7 +20,7 @@ from app.services.access import (
     get_retro_for_facilitator,
     get_retro_for_member,
     parse_object_id,
-    require_phase,
+    require_writable_phase,
 )
 from app.services.ai import ProxyError, ProxyMalformedResponse, ProxyTimeout
 from app.services.cluster_suggestions import suggest_clusters
@@ -42,7 +42,7 @@ def _find_cluster(retro: Retrospective, cluster_id: str) -> Cluster:
 
 async def _get_clustering_retro(retro_id: str, user: User) -> Retrospective:
     retro = await get_retro_for_member(retro_id, user)
-    require_phase(retro, CLUSTER)
+    await require_writable_phase(retro, CLUSTER)
     return retro
 
 
@@ -84,7 +84,7 @@ async def suggest_clusters_for_retro(
     endpoint leaked to every member of the project.
     """
     retro = await get_retro_for_facilitator(retro_id, user)
-    require_phase(retro, CLUSTER)
+    await require_writable_phase(retro, CLUSTER)
 
     try:
         return await suggest_clusters(retro)
@@ -171,7 +171,7 @@ async def move_card(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="This cycle has no retrospective"
         )
-    require_phase(retro, CLUSTER)
+    await require_writable_phase(retro, CLUSTER)
 
     if body.cluster_id is not None:
         _find_cluster(retro, body.cluster_id)

@@ -31,7 +31,7 @@ from app.schemas.transcript import (
     TranscriptAcceptedResponse,
     TranscriptRequest,
 )
-from app.services.access import get_retro_for_facilitator, require_phase
+from app.services.access import get_retro_for_facilitator, require_cycle_open, require_phase
 from app.services.transcript import (
     PROCESSING,
     confirm_suggestions,
@@ -48,6 +48,18 @@ async def _facilitator_retro(retro_id: str, user: User) -> Retrospective:
     """Membership and role first, then phase — the same order #9 uses."""
     retro = await get_retro_for_facilitator(retro_id, user)
     require_phase(retro, DISCUSS)
+    return retro
+
+
+async def _writable_retro(retro_id: str, user: User) -> Retrospective:
+    """The same, plus the cycle still being open (#20).
+
+    Split from the reader above rather than folded into it: `GET /suggestions`
+    has to keep working on a published retro, and a shared helper that closed
+    the gate would have taken the read down with the writes.
+    """
+    retro = await _facilitator_retro(retro_id, user)
+    await require_cycle_open(retro)
     return retro
 
 
@@ -71,7 +83,7 @@ async def paste_transcript(
     that: they are real rows in `retro.decisions` and `retro.actions` already,
     and confirmation is one-way.
     """
-    retro = await _facilitator_retro(retro_id, user)
+    retro = await _writable_retro(retro_id, user)
 
     if is_processing(retro):
         raise HTTPException(
@@ -110,7 +122,7 @@ async def confirm(
     than a conflict — the same reasoning #9 used for re-confirming a decision.
     The save happens once, at the end, so a refusal has written nothing.
     """
-    retro = await _facilitator_retro(retro_id, user)
+    retro = await _writable_retro(retro_id, user)
     result = await confirm_suggestions(retro, body)
     await retro.save()
     return ConfirmResponse(**result)

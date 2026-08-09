@@ -113,6 +113,38 @@ AI extraction returns owner names as strings. The backend does a best-effort
 match against project member display names. Unmatched owners are flagged for
 the facilitator to resolve during confirmation.
 
+## Closed cycles
+
+### A closed cycle refuses every retrospective write (issue #20)
+One shared guard in `app/services/access.py` — `require_writable_phase(retro,
+phase)`, which is `require_phase` plus `require_cycle_open` — stands in front of
+every phase-gated retro command: phase advance, clusters and card moves, the AI
+cluster suggestion, ballots, every discussion mutation, both transcript writes.
+No router carries its own copy of the check and it is not middleware.
+
+The refusal is `400` with the fixed detail `The retrospective's cycle is
+closed`, not `409`. It is the same kind of refusal as the wrong phase — the
+request is well-formed and the caller is entitled to make it, the retrospective
+is simply not in a state that accepts it — so it shares that status code and is
+told apart by the detail.
+
+### Authorized reads are never closed-gated (issue #20)
+No GET calls the guard. A published retro that could not be read afterwards
+would defeat publishing it; every read keeps exactly the phase and role rules it
+already had, including #10's facilitator-and-`discuss` restriction on
+`GET /suggestions`.
+
+### Publish checks before it closes (issue #20)
+`POST /summary/publish` calls `require_cycle_open` while the cycle is still
+open, so the first publish succeeds and every command after it is refused —
+including a second publish, which now fails on the closed cycle as well as on
+the `done` phase.
+
+### The guard is a request-time check, not a transaction (issue #20)
+It refuses every request that observes an already-closed cycle. A mutation that
+passed the guard before a concurrent close committed is #34's, and is
+deliberately not claimed here.
+
 ## Summary
 
 ### Summary is assembled on read (issue #11)

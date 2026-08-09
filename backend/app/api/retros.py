@@ -10,6 +10,7 @@ from app.services.access import (
     get_cycle_for_facilitator,
     get_retro_for_facilitator,
     get_retro_for_member,
+    require_cycle_open,
 )
 from app.services.discussion import create_topics, topic_to_dict
 from app.services.realtime import broadcast
@@ -94,6 +95,10 @@ async def update_phase(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Phase moves one step at a time; {retro.phase} can only become {allowed}",
         )
+
+    # After "is this a legal next phase" and before anything is written, so a
+    # closed cycle and an illegal jump each keep their own 400 detail (#20).
+    await require_cycle_open(retro)
 
     closes_voting = retro.phase == VOTE and allowed == DISCUSS
     retro.phase = allowed

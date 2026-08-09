@@ -3,7 +3,7 @@
 from beanie import PydanticObjectId
 from fastapi import HTTPException, status
 
-from app.models.cycle import Cycle
+from app.models.cycle import CLOSED, Cycle
 from app.models.project import Project
 from app.models.retro import Retrospective
 from app.models.user import User
@@ -82,3 +82,39 @@ def require_phase(retro: Retrospective, phase: str) -> None:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Only available during the {phase} phase",
         )
+
+
+async def require_cycle_open(retro: Retrospective) -> None:
+    """A closed cycle's retrospective takes no more writes (#20).
+
+    Closing is what #11's publish does last, and it is one-way. Everything the
+    retro is made of — cards, clusters, ballots, topics, decisions, actions — is
+    therefore final, and a command arriving afterwards is editing a record the
+    team has already signed off.
+
+    400 rather than 409, because this is the same kind of refusal as the wrong
+    phase: the request is well-formed and the caller is allowed to make it, the
+    retrospective is simply not in a state that accepts it. The two share a
+    status code and are told apart by their detail, which is why this one is a
+    fixed string rather than assembled per endpoint.
+
+    Only writes. Reading a finished retro is the point of having published it,
+    so no GET calls this.
+    """
+    cycle = await load_cycle(str(retro.cycle_id))
+    if cycle.status == CLOSED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The retrospective's cycle is closed",
+        )
+
+
+async def require_writable_phase(retro: Retrospective, phase: str) -> None:
+    """The gate every phase-gated retro command goes through.
+
+    Phase first, then the cycle: a caller in the wrong phase is told that,
+    whether or not the cycle behind it is closed. That ordering is what keeps
+    the wrong-phase 400 meaning what it meant before #20 existed.
+    """
+    require_phase(retro, phase)
+    await require_cycle_open(retro)
