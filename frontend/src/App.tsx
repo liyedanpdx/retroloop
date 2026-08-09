@@ -8,6 +8,8 @@ import { FeedbackPage } from "./pages/FeedbackPage";
 import { ProjectDetailPage } from "./pages/ProjectDetailPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
 import { RetroBoardPage } from "./pages/RetroBoardPage";
+import { SummaryPage } from "./pages/SummaryPage";
+import { TranscriptPage } from "./pages/TranscriptPage";
 import { RegisterPage } from "./pages/RegisterPage";
 
 /**
@@ -32,6 +34,8 @@ export function AppRoutes() {
             <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
             <Route path="/projects/:projectId/feedback" element={<FeedbackPage />} />
             <Route path="/retros/:retroId" element={<RetroBoardPage />} />
+            <Route path="/retros/:retroId/transcript" element={<TranscriptPage />} />
+            <Route path="/retros/:retroId/summary" element={<SummaryPage />} />
           </Route>
         </Route>
 
