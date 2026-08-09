@@ -20,6 +20,19 @@ export const CATEGORY_LABELS: Record<Category, string> = {
 
 export const COLLECTING = "collecting";
 
+/** 类别 → 卡片左边那道墨。
+ *
+ * 写成映射而不是 `card-${category}`:Tailwind 靠扫描源码里的字面量决定保留
+ * 哪些类,拼出来的名字它看不见,会被当成没用的清掉 —— 那正是这三条彩边第一
+ * 次没出现的原因。
+ */
+export const CARD_INK: Record<string, string> = {
+  start: "card-start",
+  stop: "card-stop",
+  continue: "card-continue",
+};
+
+
 export const ANONYMOUS_WARNING =
   "Anonymous cards cannot be edited or deleted, and will disappear from your " +
   "private list after submission.";

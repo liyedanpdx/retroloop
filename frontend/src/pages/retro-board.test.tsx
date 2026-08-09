@@ -821,7 +821,10 @@ describe("live updates", () => {
 
     await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
     lastSocket().open();
-    expect(await screen.findByText("Connection: Connected")).toBeInTheDocument();
+    // 断言可访问名而不是可见文本:徽标上只印一个词,读屏拿到的是完整那句。
+    expect(
+      await screen.findByRole("status", { name: "Connection: Connected" })
+    ).toBeInTheDocument();
     expect(lastSocket().url).toContain("/ws/retro/r1?token=");
 
     unmount();

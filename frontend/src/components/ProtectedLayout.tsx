@@ -12,17 +12,17 @@ export function ProtectedLayout() {
   const { user, logout } = useAuth();
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="flex items-center justify-between border-b bg-white px-6 py-3">
-        <span className="font-bold text-gray-900">RetroLoop</span>
+    <div className="min-h-screen">
+      <nav className="topbar">
+        <span className="wordmark">RetroLoop</span>
         <div className="flex items-center gap-4">
-          {user && <span>{user.display_name}</span>}
-          <button type="button" onClick={() => void logout()} className="underline">
+          {user && <span className="meta">{user.display_name}</span>}
+          <button type="button" onClick={() => void logout()} className="btn-link">
             Logout
           </button>
         </div>
       </nav>
-      <main className="p-6">
+      <main className="page rise">
         <Outlet />
       </main>
     </div>

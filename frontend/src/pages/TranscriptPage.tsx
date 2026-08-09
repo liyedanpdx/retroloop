@@ -159,7 +159,7 @@ export function TranscriptPage() {
     return (
       <div role="alert" className="space-y-2">
         <p>We could not load this retrospective.</p>
-        <button type="button" onClick={() => void load()} className="underline">
+        <button type="button" onClick={() => void load()} className="btn-link">
           Retry
         </button>
       </div>
@@ -248,7 +248,7 @@ export function TranscriptPage() {
   return (
     <div className="space-y-6">
       <header className="space-y-1">
-        <h1 className="text-2xl font-bold text-gray-900">Meeting transcript</h1>
+        <h1>Meeting transcript</h1>
         <p>
           <Link to={`/retros/${retro.id}`}>Back to the board</Link> ·{" "}
           <Link to={`/retros/${retro.id}/summary`}>Summary</Link>
@@ -265,7 +265,7 @@ export function TranscriptPage() {
             value={text}
             disabled={pending}
             onChange={(event) => setText(event.target.value)}
-            className="h-48 w-full rounded border px-3 py-2"
+            className="min-h-48"
           />
           <p>
             {text.length} / {MAX_TRANSCRIPT_CHARS}
@@ -275,7 +275,7 @@ export function TranscriptPage() {
             project's AI service.
           </p>
           {formError && (
-            <p role="alert" className="text-red-700">
+            <p role="alert">
               {formError}
             </p>
           )}
@@ -283,7 +283,7 @@ export function TranscriptPage() {
             type="button"
             disabled={pending}
             onClick={() => void extract(false)}
-            className="rounded bg-gray-900 px-4 py-2 text-white disabled:opacity-50"
+            className="btn btn-primary"
           >
             {pending ? "Sending…" : "Extract"}
           </button>
@@ -295,7 +295,7 @@ export function TranscriptPage() {
           <p>{REPLACE_WARNING}</p>
           <button
             type="button"
-            className="underline"
+            className="btn-link"
             onClick={() => {
               setConfirming(false);
               void extract(true);
@@ -303,7 +303,7 @@ export function TranscriptPage() {
           >
             Yes, replace it
           </button>
-          <button type="button" className="ml-3 underline" onClick={() => setConfirming(false)}>
+          <button type="button" className="btn-link ml-3" onClick={() => setConfirming(false)}>
             Cancel
           </button>
         </div>
@@ -314,7 +314,7 @@ export function TranscriptPage() {
           <p>{pollError}</p>
           <button
             type="button"
-            className="underline"
+            className="btn-link"
             onClick={() => {
               setPollError(null);
               void poll();
@@ -328,7 +328,7 @@ export function TranscriptPage() {
       {suggestions.status === "failed" && (
         <div role="alert" className="space-y-2">
           <p>{extractionError(suggestions.error)}</p>
-          <button type="button" onClick={() => void extract(true)} className="underline">
+          <button type="button" onClick={() => void extract(true)} className="btn-link">
             Retry extraction
           </button>
         </div>
@@ -463,16 +463,16 @@ function Review({
 
   return (
     <section className="space-y-4">
-      <h2 className="text-xl font-semibold">Review the drafts</h2>
+      <h2>Review the drafts</h2>
       {error && <p role="alert">{error}</p>}
 
       <h3 className="font-semibold">Decisions</h3>
       {suggestions.decisions.length === 0 ? (
-        <p>No decisions were extracted</p>
+        <p className="empty">No decisions were extracted</p>
       ) : (
         <ul className="space-y-2">
           {suggestions.decisions.map((row) => (
-            <li key={row.id} className="rounded border p-3">
+            <li key={row.id} className="card">
               {row.state === "confirmed" ? (
                 <p>
                   {row.text} — kept as {row.created_id}
@@ -490,7 +490,7 @@ function Review({
                         [row.id]: { ...decisions[row.id], text: event.target.value },
                       })
                     }
-                    className="w-full rounded border px-2 py-1"
+                   
                   />
                   <ChoiceControls
                     name={`decision-choice-${row.id}`}
@@ -510,11 +510,11 @@ function Review({
 
       <h3 className="font-semibold">Actions</h3>
       {suggestions.actions.length === 0 ? (
-        <p>No actions were extracted</p>
+        <p className="empty">No actions were extracted</p>
       ) : (
         <ul className="space-y-2">
           {suggestions.actions.map((row) => (
-            <li key={row.id} className="rounded border p-3">
+            <li key={row.id} className="card">
               {row.state === "confirmed" ? (
                 <p>
                   {row.description} — kept as {row.created_id}
@@ -532,7 +532,7 @@ function Review({
                         [row.id]: { ...actions[row.id], description: event.target.value },
                       })
                     }
-                    className="w-full rounded border px-2 py-1"
+                   
                   />
                   {/* The extracted name stays visible even when it matched
                       nothing — it is the only record of who the meeting named. */}
@@ -549,7 +549,7 @@ function Review({
                         [row.id]: { ...actions[row.id], ownerId: event.target.value },
                       })
                     }
-                    className="rounded border px-2 py-1"
+                   
                   >
                     <option value="">Unassigned</option>
                     {members.map((member) => (
@@ -571,7 +571,7 @@ function Review({
                         [row.id]: { ...actions[row.id], dueDate: event.target.value },
                       })
                     }
-                    className="rounded border px-2 py-1"
+                   
                   />
 
                   <ChoiceControls
@@ -594,7 +594,7 @@ function Review({
         type="button"
         disabled={!anyChosen || pending}
         onClick={() => void apply()}
-        className="rounded bg-gray-900 px-4 py-2 text-white disabled:opacity-50"
+        className="btn btn-primary"
       >
         {pending ? "Applying…" : "Apply review"}
       </button>

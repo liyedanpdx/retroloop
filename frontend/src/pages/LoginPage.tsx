@@ -46,12 +46,12 @@ export function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50">
+    <main className="min-h-screen flex items-center justify-center">
       <form onSubmit={onSubmit} noValidate className="w-full max-w-sm space-y-4 p-6">
-        <h1 className="text-2xl font-bold text-gray-900">Log in to RetroLoop</h1>
+        <h1>Log in to RetroLoop</h1>
 
         {failure && (
-          <p role="alert" className="text-red-700">
+          <p role="alert">
             {failure}
           </p>
         )}
@@ -69,7 +69,7 @@ export function LoginPage() {
             className="w-full border rounded px-3 py-2"
           />
           {errors.email && (
-            <p id="email-error" role="alert" className="text-red-700">
+            <p id="email-error" role="alert">
               {errors.email}
             </p>
           )}
@@ -88,7 +88,7 @@ export function LoginPage() {
             className="w-full border rounded px-3 py-2"
           />
           {errors.password && (
-            <p id="password-error" role="alert" className="text-red-700">
+            <p id="password-error" role="alert">
               {errors.password}
             </p>
           )}
@@ -97,7 +97,7 @@ export function LoginPage() {
         <button
           type="submit"
           disabled={pending}
-          className="w-full bg-gray-900 text-white rounded py-2 disabled:opacity-50"
+          className="btn btn-primary w-full justify-center"
         >
           {pending ? "Logging in…" : "Log in"}
         </button>

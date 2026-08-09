@@ -134,13 +134,12 @@ export function ClusterPanel({
             id="cluster-name"
             value={name}
             onChange={(event) => setName(event.target.value)}
-            className="rounded border px-3 py-2"
           />
         </div>
         <button
           type="submit"
           disabled={creating}
-          className="rounded bg-gray-900 px-3 py-2 text-white disabled:opacity-50"
+          className="btn btn-primary"
         >
           {creating ? "Adding cluster…" : "Add cluster"}
         </button>
@@ -214,11 +213,11 @@ function Bucket({
 }) {
   const { setNodeRef } = useDroppable({ id });
   return (
-    <section ref={setNodeRef} className="space-y-2 rounded border p-3">
+    <section ref={setNodeRef} className="card space-y-2">
       <h3 className="font-semibold">{title}</h3>
       {controls}
       {cards.length === 0 ? (
-        <p>No cards in {title}</p>
+        <p className="empty">No cards in {title}</p>
       ) : (
         <ul className="space-y-2">
           {cards.map((card) => (
@@ -252,7 +251,7 @@ function CardTile({
 }) {
   const { attributes, listeners, setNodeRef } = useDraggable({ id: card.id, disabled: pending });
   return (
-    <li ref={setNodeRef} className="rounded border p-2">
+    <li ref={setNodeRef} className="card">
       <p
         {...attributes}
         {...listeners}
@@ -272,7 +271,7 @@ function CardTile({
             event.target.value === UNCLUSTERED ? null : event.target.value
           )
         }
-        className="w-full rounded border px-2 py-1"
+       
       >
         <option value={UNCLUSTERED}>{UNCLUSTERED}</option>
         {clusters.map((cluster) => (
@@ -330,12 +329,11 @@ function ClusterControls({
             value={draft}
             disabled={pending}
             onChange={(event) => setDraft(event.target.value)}
-            className="w-full rounded border px-2 py-1"
           />
           <button
             type="button"
             disabled={pending}
-            className="underline"
+            className="btn-link"
             onClick={() => {
               const trimmed = draft.trim();
               if (!trimmed) {
@@ -365,7 +363,7 @@ function ClusterControls({
               setDraft(cluster.name);
               setRenaming(true);
             }}
-            className="underline disabled:opacity-50"
+            className="btn-link"
           >
             Rename {cluster.name}
           </button>
@@ -373,7 +371,7 @@ function ClusterControls({
             type="button"
             disabled={pending}
             onClick={() => setConfirming(true)}
-            className="underline disabled:opacity-50"
+            className="btn-link"
           >
             Delete {cluster.name}
           </button>
@@ -387,7 +385,7 @@ function ClusterControls({
           <p>Delete {cluster.name}? Its cards become unclustered.</p>
           <button
             type="button"
-            className="underline"
+            className="btn-link"
             onClick={() => {
               setConfirming(false);
               void run(async () => {
@@ -398,7 +396,7 @@ function ClusterControls({
           >
             Yes, delete {cluster.name}
           </button>
-          <button type="button" onClick={() => setConfirming(false)} className="ml-3 underline">
+          <button type="button" onClick={() => setConfirming(false)} className="btn-link ml-3">
             Cancel
           </button>
         </div>
@@ -424,7 +422,7 @@ function SuggestButton({ retroId }: { retroId: string }) {
       <button
         type="button"
         disabled={pending}
-        className="rounded border px-3 py-2 disabled:opacity-50"
+        className="btn"
         onClick={() => {
           setPending(true);
           setError(null);

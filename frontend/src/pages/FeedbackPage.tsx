@@ -4,6 +4,7 @@ import { isAxiosError } from "axios";
 
 import {
   ANONYMOUS_WARNING,
+  CARD_INK,
   CATEGORIES,
   CATEGORY_LABELS,
   COLLECTING,
@@ -81,7 +82,7 @@ export function FeedbackPage() {
     return (
       <div role="alert" className="space-y-2">
         <p>We could not load your feedback.</p>
-        <button type="button" onClick={() => void load()} className="underline">
+        <button type="button" onClick={() => void load()} className="btn-link">
           Retry
         </button>
       </div>
@@ -95,13 +96,13 @@ export function FeedbackPage() {
   return (
     <div className="space-y-6">
       <header className="space-y-2">
-        <h1 className="text-2xl font-bold text-gray-900">Your feedback</h1>
+        <h1>Your feedback</h1>
         <p>
           <Link to={`/projects/${projectId}`}>Back to the project</Link>
         </p>
         {!collecting && <p role="status">{FROZEN_MESSAGE}</p>}
         {announcement && (
-          <p role="status" className="text-green-800">
+          <p role="status" className="meta">
             {announcement}
           </p>
         )}
@@ -206,10 +207,10 @@ function CategoryColumn({
 
   return (
     <section className="space-y-3">
-      <h2 className="text-xl font-semibold">{label}</h2>
+      <h2>{label}</h2>
 
       {collecting && (
-        <form onSubmit={onSubmit} noValidate className="space-y-2 rounded border p-3">
+        <form onSubmit={onSubmit} noValidate className="card space-y-2">
           <label htmlFor={`${category}-text`}>{label} feedback</label>
           <textarea
             id={`${category}-text`}
@@ -218,7 +219,6 @@ function CategoryColumn({
             disabled={pending}
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? `${category}-error` : undefined}
-            className="w-full rounded border px-3 py-2"
           />
 
           <div>
@@ -232,10 +232,10 @@ function CategoryColumn({
             <label htmlFor={`${category}-anonymous`}> Submit this {label} card anonymously</label>
           </div>
 
-          {anonymous && <p className="text-amber-800">{ANONYMOUS_WARNING}</p>}
+          {anonymous && <p className="meta">{ANONYMOUS_WARNING}</p>}
 
           {error && (
-            <p id={`${category}-error`} role="alert" className="text-red-700">
+            <p id={`${category}-error`} role="alert">
               {error}
             </p>
           )}
@@ -243,7 +243,7 @@ function CategoryColumn({
           <button
             type="submit"
             disabled={pending}
-            className="rounded bg-gray-900 px-3 py-2 text-white disabled:opacity-50"
+            className="btn btn-primary"
           >
             {pending ? `Adding ${label} card…` : `Add ${label} card`}
           </button>
@@ -255,7 +255,7 @@ function CategoryColumn({
           role="dialog"
           aria-modal="true"
           aria-label={`Confirm anonymous ${label} card`}
-          className="rounded border p-3"
+          className="card"
         >
           <p>{ANONYMOUS_WARNING}</p>
           <div className="flex gap-3">
@@ -265,11 +265,11 @@ function CategoryColumn({
                 setConfirming(false);
                 void submit(true);
               }}
-              className="underline"
+              className="btn-link"
             >
               Yes, submit anonymously
             </button>
-            <button type="button" onClick={() => setConfirming(false)} className="underline">
+            <button type="button" onClick={() => setConfirming(false)} className="btn-link">
               Cancel
             </button>
           </div>
@@ -277,7 +277,7 @@ function CategoryColumn({
       )}
 
       {cards.length === 0 ? (
-        <p>No {label} cards yet</p>
+        <p className="empty">No {label} cards yet</p>
       ) : (
         <ul className="space-y-2">
           {cards.map((card) => (
@@ -354,7 +354,7 @@ function CardRow({
   }
 
   return (
-    <li className="rounded border p-3">
+    <li className={`card ${CARD_INK[card.category]}`}>
       {editing ? (
         <div className="space-y-2">
           <label htmlFor={`edit-${card.id}`}>Edit {label} card</label>
@@ -371,9 +371,8 @@ function CardRow({
               }
             }}
             onBlur={() => void save()}
-            className="w-full rounded border px-3 py-2"
           />
-          <button type="button" onClick={() => void save()} disabled={pending} className="underline">
+          <button type="button" onClick={() => void save()} disabled={pending} className="btn-link">
             Save
           </button>
         </div>
@@ -384,7 +383,7 @@ function CardRow({
       <p>Added {formatDate(card.created_at, "date unknown")}</p>
 
       {error && (
-        <p role="alert" className="text-red-700">
+        <p role="alert">
           {error}
         </p>
       )}
@@ -398,7 +397,7 @@ function CardRow({
               setDraft(card.text);
               setEditing(true);
             }}
-            className="underline disabled:opacity-50"
+            className="btn-link"
           >
             Edit {label} card
           </button>
@@ -406,7 +405,7 @@ function CardRow({
             type="button"
             disabled={pending}
             onClick={() => setConfirming("anonymous")}
-            className="underline disabled:opacity-50"
+            className="btn-link"
           >
             Make anonymous
           </button>
@@ -414,7 +413,7 @@ function CardRow({
             type="button"
             disabled={pending}
             onClick={() => setConfirming("delete")}
-            className="underline disabled:opacity-50"
+            className="btn-link"
           >
             Delete {label} card
           </button>
@@ -426,7 +425,7 @@ function CardRow({
           <p>{ANONYMOUS_WARNING}</p>
           <button
             type="button"
-            className="underline"
+            className="btn-link"
             onClick={() => {
               setConfirming(null);
               void run(async () => {
@@ -438,7 +437,7 @@ function CardRow({
           >
             Yes, make it anonymous
           </button>
-          <button type="button" onClick={() => setConfirming(null)} className="ml-3 underline">
+          <button type="button" onClick={() => setConfirming(null)} className="btn-link ml-3">
             Cancel
           </button>
         </div>
@@ -449,7 +448,7 @@ function CardRow({
           <p>Delete this {label} card?</p>
           <button
             type="button"
-            className="underline"
+            className="btn-link"
             onClick={() => {
               setConfirming(null);
               void run(async () => {
@@ -460,7 +459,7 @@ function CardRow({
           >
             Yes, delete it
           </button>
-          <button type="button" onClick={() => setConfirming(null)} className="ml-3 underline">
+          <button type="button" onClick={() => setConfirming(null)} className="btn-link ml-3">
             Cancel
           </button>
         </div>

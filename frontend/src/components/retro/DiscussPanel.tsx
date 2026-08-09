@@ -66,7 +66,7 @@ export function DiscussPanel({
 
   return (
     <div className="space-y-6">
-      {topics.length === 0 && <p>No topics were generated — nothing was voted on.</p>}
+      {topics.length === 0 && <p className="empty">No topics were generated — nothing was voted on.</p>}
 
       {groups.map(({ key, title, topic }) => {
         const decisions =
@@ -81,8 +81,8 @@ export function DiscussPanel({
           return null;
         }
         return (
-          <section key={key} className="space-y-2 rounded border p-4">
-            <h3 className="text-lg font-semibold break-words">{title}</h3>
+          <section key={key} className="panel space-y-2">
+            <h3 className="break-words">{title}</h3>
             {topic && (
               <TopicControls
                 retroId={retro.id}
@@ -95,7 +95,7 @@ export function DiscussPanel({
 
             <h4 className="font-semibold">Decisions</h4>
             {decisions.length === 0 ? (
-              <p>No decisions</p>
+              <p className="empty">No decisions</p>
             ) : (
               <ul className="space-y-1">
                 {decisions.map((decision) => (
@@ -113,7 +113,7 @@ export function DiscussPanel({
 
             <h4 className="font-semibold">Actions</h4>
             {actions.length === 0 ? (
-              <p>No actions</p>
+              <p className="empty">No actions</p>
             ) : (
               <ul className="space-y-1">
                 {actions.map((action) => (
@@ -212,7 +212,7 @@ function TopicControls({
             await onChanged();
           })
         }
-        className="rounded border px-2 py-1"
+       
       >
         {TOPIC_STATUSES.map((status) => (
           <option key={status} value={status}>
@@ -227,12 +227,12 @@ function TopicControls({
         value={notes}
         disabled={pending}
         onChange={(event) => setNotes(event.target.value)}
-        className="w-full rounded border px-2 py-1"
+       
       />
       <button
         type="button"
         disabled={pending}
-        className="underline"
+        className="btn-link"
         onClick={() => {
           // An empty string is a legal note. Only an unchanged value is a no-op.
           if (notes === topic.notes) {
@@ -269,7 +269,7 @@ function DecisionRow({
   const { error, pending, run } = useMutation(onConflict);
 
   return (
-    <li className="rounded border p-2">
+    <li className="card">
       <p className="break-words">{decision.text}</p>
       <p>{decision.is_confirmed ? "Confirmed" : "Draft"}</p>
       {error && <p role="alert">{error}</p>}
@@ -279,7 +279,7 @@ function DecisionRow({
           <button
             type="button"
             disabled={pending}
-            className="underline disabled:opacity-50"
+            className="btn-link"
             onClick={() =>
               void run(async () => {
                 await updateDecision(retroId, decision.id, {
@@ -294,7 +294,7 @@ function DecisionRow({
           <button
             type="button"
             disabled={pending}
-            className="underline disabled:opacity-50"
+            className="btn-link"
             onClick={() => setConfirming(true)}
           >
             Delete this decision
@@ -307,7 +307,7 @@ function DecisionRow({
           <p>Delete “{decision.text}”?</p>
           <button
             type="button"
-            className="underline"
+            className="btn-link"
             onClick={() => {
               setConfirming(false);
               void run(async () => {
@@ -318,7 +318,7 @@ function DecisionRow({
           >
             Yes, delete this decision
           </button>
-          <button type="button" className="ml-3 underline" onClick={() => setConfirming(false)}>
+          <button type="button" className="btn-link ml-3" onClick={() => setConfirming(false)}>
             Cancel
           </button>
         </div>
@@ -353,7 +353,7 @@ function ActionRow({
     UNASSIGNED;
 
   return (
-    <li className="rounded border p-2">
+    <li className="card">
       <p className="break-words">{action.description}</p>
       <p>Owner: {ownerName}</p>
       {error && <p role="alert">{error}</p>}
@@ -372,7 +372,6 @@ function ActionRow({
                   await onChanged();
                 })
               }
-              className="rounded border px-2 py-1"
             >
               <option value="open">open</option>
               <option value="done">done</option>
@@ -396,7 +395,6 @@ function ActionRow({
                   await onChanged();
                 })
               }
-              className="rounded border px-2 py-1"
             />
           </div>
         </div>
@@ -418,7 +416,6 @@ function ActionRow({
                   await onChanged();
                 })
               }
-              className="rounded border px-2 py-1"
             >
               <option value="">{UNASSIGNED}</option>
               {members.map((member) => (
@@ -431,7 +428,7 @@ function ActionRow({
           <button
             type="button"
             disabled={pending}
-            className="underline disabled:opacity-50"
+            className="btn-link"
             onClick={() => setConfirming(true)}
           >
             Delete this action
@@ -444,7 +441,7 @@ function ActionRow({
           <p>Delete “{action.description}”?</p>
           <button
             type="button"
-            className="underline"
+            className="btn-link"
             onClick={() => {
               setConfirming(false);
               void run(async () => {
@@ -455,7 +452,7 @@ function ActionRow({
           >
             Yes, delete this action
           </button>
-          <button type="button" className="ml-3 underline" onClick={() => setConfirming(false)}>
+          <button type="button" className="btn-link ml-3" onClick={() => setConfirming(false)}>
             Cancel
           </button>
         </div>
@@ -529,10 +526,9 @@ function Composers({
             id={`new-decision-${suffix}`}
             value={decisionText}
             onChange={(event) => setDecisionText(event.target.value)}
-            className="rounded border px-2 py-1"
           />
         </div>
-        <button type="submit" disabled={pending} className="underline disabled:opacity-50">
+        <button type="submit" disabled={pending} className="btn-link">
           Add decision to {topicLabel}
         </button>
       </form>
@@ -544,7 +540,6 @@ function Composers({
             id={`new-action-${suffix}`}
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            className="rounded border px-2 py-1"
           />
         </div>
         <div>
@@ -553,7 +548,6 @@ function Composers({
             id={`new-action-owner-${suffix}`}
             value={ownerId}
             onChange={(event) => setOwnerId(event.target.value)}
-            className="rounded border px-2 py-1"
           >
             <option value="">{UNASSIGNED}</option>
             {members.map((member) => (
@@ -563,7 +557,7 @@ function Composers({
             ))}
           </select>
         </div>
-        <button type="submit" disabled={pending} className="underline disabled:opacity-50">
+        <button type="submit" disabled={pending} className="btn-link">
           Add action to {topicLabel}
         </button>
       </form>

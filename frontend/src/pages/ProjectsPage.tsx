@@ -68,7 +68,7 @@ export function ProjectsPage() {
   return (
     <section className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
+        <h1>Projects</h1>
         <button
           type="button"
           onClick={() => setCreating((open) => !open)}
@@ -79,7 +79,7 @@ export function ProjectsPage() {
       </div>
 
       {creating && (
-        <form onSubmit={onCreate} noValidate className="max-w-md space-y-3 rounded border p-4">
+        <form onSubmit={onCreate} noValidate className="panel max-w-md space-y-3">
           <div>
             <label htmlFor="project-name">Project name</label>
             <input
@@ -88,10 +88,9 @@ export function ProjectsPage() {
               onChange={(event) => setName(event.target.value)}
               aria-invalid={nameError ? true : undefined}
               aria-describedby={nameError ? "project-name-error" : undefined}
-              className="w-full rounded border px-3 py-2"
             />
             {nameError && (
-              <p id="project-name-error" role="alert" className="text-red-700">
+              <p id="project-name-error" role="alert">
                 {nameError}
               </p>
             )}
@@ -103,12 +102,11 @@ export function ProjectsPage() {
               id="project-description"
               value={description}
               onChange={(event) => setDescription(event.target.value)}
-              className="w-full rounded border px-3 py-2"
             />
           </div>
 
           {createError && (
-            <p role="alert" className="text-red-700">
+            <p role="alert">
               {createError}
             </p>
           )}
@@ -116,7 +114,7 @@ export function ProjectsPage() {
           <button
             type="submit"
             disabled={pending}
-            className="rounded bg-gray-900 px-4 py-2 text-white disabled:opacity-50"
+            className="btn btn-primary"
           >
             {pending ? "Creating…" : "Create project"}
           </button>
@@ -130,14 +128,14 @@ export function ProjectsPage() {
       {loadError && (
         <div role="alert" className="space-y-2">
           <p>{loadError}</p>
-          <button type="button" onClick={() => void load()} className="underline">
+          <button type="button" onClick={() => void load()} className="btn-link">
             Retry
           </button>
         </div>
       )}
 
       {projects !== null && projects.length === 0 && (
-        <p>No projects yet. Create one to get started.</p>
+        <p className="empty">No projects yet. Create one to get started.</p>
       )}
 
       {projects !== null && projects.length > 0 && (
@@ -145,7 +143,7 @@ export function ProjectsPage() {
           {projects.map((project) => {
             const role = roleIn(project, user?.id);
             return (
-              <li key={project.id} className="rounded border p-4">
+              <li key={project.id} className="panel">
                 <h2 className="text-lg font-semibold">
                   <Link to={`/projects/${project.id}`}>{project.name}</Link>
                 </h2>

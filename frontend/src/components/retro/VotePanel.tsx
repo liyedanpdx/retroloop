@@ -105,7 +105,7 @@ export function VotePanel({
               type="button"
               disabled={pending}
               onClick={() => setConfirming(true)}
-              className="underline disabled:opacity-50"
+              className="btn-link"
             >
               Withdraw my ballot
             </button>
@@ -119,7 +119,7 @@ export function VotePanel({
               </p>
               <button
                 type="button"
-                className="underline"
+                className="btn-link"
                 onClick={() => {
                   setConfirming(false);
                   setPending(true);
@@ -137,7 +137,7 @@ export function VotePanel({
               </button>
               <button
                 type="button"
-                className="ml-3 underline"
+                className="btn-link ml-3"
                 onClick={() => setConfirming(false)}
               >
                 Cancel
@@ -154,14 +154,14 @@ export function VotePanel({
             {clusters.map((cluster) => {
               const count = ballot.filter((id) => id === cluster.id).length;
               return (
-                <li key={cluster.id} className="rounded border p-3">
+                <li key={cluster.id} className="card">
                   <p className="font-semibold break-words">{cluster.name}</p>
                   <p>{count} of your votes</p>
                   <button
                     type="button"
                     disabled={spent >= MAX_VOTES || pending}
                     onClick={() => add(cluster.id)}
-                    className="underline disabled:opacity-50"
+                    className="btn-link"
                   >
                     Vote for {cluster.name}
                   </button>
@@ -182,7 +182,7 @@ export function VotePanel({
             type="button"
             disabled={ballot.length === 0 || pending}
             onClick={() => void submit()}
-            className="rounded bg-gray-900 px-4 py-2 text-white disabled:opacity-50"
+            className="btn btn-primary"
           >
             {pending ? "Submitting…" : "Submit ballot"}
           </button>
@@ -190,7 +190,7 @@ export function VotePanel({
       )}
 
       {results === null ? (
-        <p>Results are hidden until voting closes.</p>
+        <p className="empty">Results are hidden until voting closes.</p>
       ) : (
         <div>
           <h3 className="font-semibold">Results</h3>

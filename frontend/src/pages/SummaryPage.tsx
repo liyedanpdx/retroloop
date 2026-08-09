@@ -104,7 +104,7 @@ export function SummaryPage() {
     return (
       <div role="alert" className="space-y-2">
         <p>We could not load the summary.</p>
-        <button type="button" onClick={() => void load()} className="underline">
+        <button type="button" onClick={() => void load()} className="btn-link">
           Retry
         </button>
       </div>
@@ -141,7 +141,7 @@ export function SummaryPage() {
   return (
     <div className="space-y-6">
       <header className="space-y-1">
-        <h1 className="text-2xl font-bold text-gray-900">Retrospective summary</h1>
+        <h1>Retrospective summary</h1>
         <p role="status">{published ? "Published" : "Preview"}</p>
         <p>
           <Link to={`/retros/${retro.id}`}>Back to the board</Link>
@@ -154,7 +154,7 @@ export function SummaryPage() {
             type="button"
             disabled={pending}
             onClick={() => setConfirming(true)}
-            className="rounded bg-gray-900 px-4 py-2 text-white disabled:opacity-50"
+            className="btn btn-primary"
           >
             {pending ? "Publishing…" : "Publish"}
           </button>
@@ -167,7 +167,7 @@ export function SummaryPage() {
           <p>{PUBLISH_WARNING}</p>
           <button
             type="button"
-            className="underline"
+            className="btn-link"
             onClick={() => {
               setConfirming(false);
               void publish();
@@ -175,16 +175,16 @@ export function SummaryPage() {
           >
             Yes, publish it
           </button>
-          <button type="button" className="ml-3 underline" onClick={() => setConfirming(false)}>
+          <button type="button" className="btn-link ml-3" onClick={() => setConfirming(false)}>
             Cancel
           </button>
         </div>
       )}
 
       <section className="space-y-2">
-        <h2 className="text-xl font-semibold">Topics</h2>
+        <h2>Topics</h2>
         {summary.topics.length === 0 ? (
-          <p>No topics</p>
+          <p className="empty">No topics</p>
         ) : (
           <ol className="space-y-1">
             {summary.topics.map((topic) => (
@@ -198,9 +198,9 @@ export function SummaryPage() {
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-xl font-semibold">Decisions</h2>
+        <h2>Decisions</h2>
         {summary.decisions.length === 0 ? (
-          <p>No decisions</p>
+          <p className="empty">No decisions</p>
         ) : (
           <ul className="space-y-1">
             {summary.decisions.map((decision) => (
@@ -213,9 +213,9 @@ export function SummaryPage() {
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-xl font-semibold">Actions</h2>
+        <h2>Actions</h2>
         {summary.actions.length === 0 ? (
-          <p>No actions</p>
+          <p className="empty">No actions</p>
         ) : (
           <ul className="space-y-1">
             {summary.actions.map((action) => (
@@ -229,7 +229,7 @@ export function SummaryPage() {
       </section>
 
       <section className="space-y-1">
-        <h2 className="text-xl font-semibold">Participation</h2>
+        <h2>Participation</h2>
         {/* Counts only. Naming who submitted or voted is exactly what #5 and #8
             were built to prevent. */}
         <p>{summary.participation.total_members} members</p>
@@ -238,7 +238,7 @@ export function SummaryPage() {
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-xl font-semibold">Feedback</h2>
+        <h2>Feedback</h2>
         <div className="grid gap-4 md:grid-cols-3">
           {CATEGORIES.map((category) => {
             const cards = summary.feedback_cards.filter((card) => card.category === category);
@@ -247,13 +247,13 @@ export function SummaryPage() {
               <div key={category}>
                 <h3 className="font-semibold">{label}</h3>
                 {cards.length === 0 ? (
-                  <p>No {label} cards</p>
+                  <p className="empty">No {label} cards</p>
                 ) : (
                   <ul className="space-y-1">
                     {cards.map((card) => (
-                      <li key={card.id} className="rounded border p-2">
+                      <li key={card.id} className="card">
                         <p className="break-words">{card.text}</p>
-                        <p className="text-sm">
+                        <p className="meta">
                           {card.is_anonymous || card.author_id === null
                             ? "Anonymous"
                             : nameOf(card.author_id)}

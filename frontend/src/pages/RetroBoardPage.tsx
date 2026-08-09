@@ -180,7 +180,7 @@ export function RetroBoardPage() {
     return (
       <div role="alert" className="space-y-2">
         <p>We could not load this retrospective.</p>
-        <button type="button" onClick={() => void load()} className="underline">
+        <button type="button" onClick={() => void load()} className="btn-link">
           Retry
         </button>
       </div>
@@ -192,19 +192,29 @@ export function RetroBoardPage() {
 
   return (
     <div className="space-y-6">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-bold text-gray-900">Retrospective</h1>
-        <PhaseIndicator phase={retro.phase} />
-        <p role="status">Connection: {STATUS_LABELS[status]}</p>
-        {status !== "connected" && (
-          <p role="status">
-            Live updates are paused. Your own changes are still saved by the server.
+      <header className="flex flex-wrap items-end justify-between gap-4 border-b border-rule pb-4">
+        <div className="space-y-2">
+          <h1>Retrospective</h1>
+          <PhaseIndicator phase={retro.phase} />
+        </div>
+        <div className="flex flex-col items-start gap-2 sm:items-end">
+          {/* 徽标上只有一个词,但可访问名是完整的一句 —— 屏幕阅读器读到
+              「Connected」而不知道是什么连上了,等于没说。 */}
+          <p role="status" aria-label={`Connection: ${STATUS_LABELS[status]}`} className="badge">
+            {STATUS_LABELS[status]}
           </p>
-        )}
-        {isFacilitator && retro.phase !== DONE && (
-          <AdvanceControl retro={retro} onChanged={load} />
-        )}
+
+          {isFacilitator && retro.phase !== DONE && (
+            <AdvanceControl retro={retro} onChanged={load} />
+          )}
+        </div>
       </header>
+
+      {status !== "connected" && (
+        <p role="status" className="meta">
+          Live updates are paused. Your own changes are still saved by the server.
+        </p>
+      )}
 
       {retro.phase === DONE ? (
         <div>
@@ -262,7 +272,7 @@ function Unavailable({ message }: { message: string }) {
 /** An indicator, not tabs. Phases move forward only, and only the facilitator moves them (#6). */
 function PhaseIndicator({ phase }: { phase: string }) {
   return (
-    <ol className="flex flex-wrap gap-3">
+    <ol className="phases">
       {PHASES.map((step) => (
         <li key={step} aria-current={step === phase ? "step" : undefined}>
           {step === phase ? `${label(step)} (current)` : label(step)}
@@ -294,7 +304,7 @@ function AdvanceControl({ retro, onChanged }: { retro: Retro; onChanged: () => P
         type="button"
         disabled={pending}
         onClick={() => setConfirming(true)}
-        className="rounded bg-gray-900 px-3 py-2 text-white disabled:opacity-50"
+        className="btn btn-primary"
       >
         {pending ? "Moving on…" : `Move to ${label(next)}`}
       </button>
@@ -305,7 +315,7 @@ function AdvanceControl({ retro, onChanged }: { retro: Retro; onChanged: () => P
           <p>Move this retrospective to {label(next)}? There is no way back.</p>
           <button
             type="button"
-            className="underline"
+            className="btn-link"
             onClick={() => {
               setConfirming(false);
               setPending(true);
@@ -324,7 +334,7 @@ function AdvanceControl({ retro, onChanged }: { retro: Retro; onChanged: () => P
           >
             Yes, move to {label(next)}
           </button>
-          <button type="button" className="ml-3 underline" onClick={() => setConfirming(false)}>
+          <button type="button" className="btn-link ml-3" onClick={() => setConfirming(false)}>
             Cancel
           </button>
         </div>

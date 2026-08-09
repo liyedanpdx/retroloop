@@ -79,7 +79,7 @@ export function ProjectDetailPage() {
     return (
       <div role="alert" className="space-y-2">
         <p>We could not load this project.</p>
-        <button type="button" onClick={() => void load()} className="underline">
+        <button type="button" onClick={() => void load()} className="btn-link">
           Retry
         </button>
       </div>
@@ -97,22 +97,18 @@ export function ProjectDetailPage() {
   return (
     <div className="space-y-8">
       <header className="space-y-1">
-        <h1 className="text-2xl font-bold text-gray-900 break-words">{project.name}</h1>
+        <h1 className="break-words">{project.name}</h1>
         {project.description && <p className="break-words">{project.description}</p>}
         <p>{role ? `You are ${role === FACILITATOR ? "a facilitator" : "a member"}` : ""}</p>
         {archived && <p role="status">This project is archived. It is read-only.</p>}
         {demoted && <p role="alert">{PERMISSION_CHANGED}</p>}
       </header>
 
-      {role === FACILITATOR && !demoted && (
-        <Settings project={project} archived={archived} onChanged={load} />
-      )}
-
       <section className="space-y-2">
-        <h2 className="text-xl font-semibold">Current cycle</h2>
+        <h2>Current cycle</h2>
         {cycle === null ? (
           <div className="space-y-2">
-            <p>No active cycle</p>
+            <p className="empty">No active cycle</p>
             {isFacilitator && (
               <CycleLifecycle projectId={project.id} cycle={null} onChanged={load} />
             )}
@@ -138,7 +134,7 @@ export function ProjectDetailPage() {
               </p>
             ) : (
               <>
-                <p>No retrospective started</p>
+                <p className="empty">No retrospective started</p>
                 {isFacilitator && (
                   <CycleLifecycle projectId={project.id} cycle={cycle} onChanged={load} />
                 )}
@@ -149,9 +145,9 @@ export function ProjectDetailPage() {
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-xl font-semibold">Past retrospectives</h2>
+        <h2>Past retrospectives</h2>
         {dashboard.past_retros.length === 0 ? (
-          <p>No past retrospectives</p>
+          <p className="empty">No past retrospectives</p>
         ) : (
           <ul className="space-y-1">
             {dashboard.past_retros.map((retro) => (
@@ -166,13 +162,13 @@ export function ProjectDetailPage() {
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-xl font-semibold">Open actions</h2>
+        <h2>Open actions</h2>
         {dashboard.open_actions.length === 0 ? (
-          <p>No open actions</p>
+          <p className="empty">No open actions</p>
         ) : (
           <ul className="space-y-2">
             {dashboard.open_actions.map((action) => (
-              <li key={action.id} className="rounded border p-3">
+              <li key={action.id} className="card">
                 <p className="break-words">{action.description}</p>
                 <p>Owner: {action.owner ?? "Unassigned"}</p>
                 <p>Due: {formatDate(action.due_date, "No due date")}</p>
@@ -193,6 +189,10 @@ export function ProjectDetailPage() {
         onChanged={load}
         onDemoted={() => setDemoted(true)}
       />
+
+      {role === FACILITATOR && !demoted && (
+        <Settings project={project} archived={archived} onChanged={load} />
+      )}
     </div>
   );
 }
@@ -245,8 +245,8 @@ function Settings({
   }
 
   return (
-    <section className="space-y-3 rounded border p-4">
-      <h2 className="text-xl font-semibold">Project settings</h2>
+    <section className="panel space-y-3">
+      <h2>Project settings</h2>
 
       {!archived && (
         <form
@@ -277,7 +277,7 @@ function Settings({
               onChange={(event) => setName(event.target.value)}
               aria-invalid={fieldError ? true : undefined}
               aria-describedby={fieldError ? "settings-name-error" : undefined}
-              className="w-full rounded border px-3 py-2"
+             
             />
             {fieldError && (
               <p id="settings-name-error" role="alert">
@@ -292,13 +292,13 @@ function Settings({
               value={description}
               disabled={pending}
               onChange={(event) => setDescription(event.target.value)}
-              className="w-full rounded border px-3 py-2"
+             
             />
           </div>
           <button
             type="submit"
             disabled={pending}
-            className="rounded bg-gray-900 px-4 py-2 text-white disabled:opacity-50"
+            className="btn btn-primary"
           >
             {pending ? "Saving…" : "Save project details"}
           </button>
@@ -311,7 +311,7 @@ function Settings({
         <button
           type="button"
           disabled={pending}
-          className="underline disabled:opacity-50"
+          className="btn-link"
           onClick={() => void run(async () => void (await setArchived(project.id, false)))}
         >
           Restore this project
@@ -320,7 +320,7 @@ function Settings({
         <button
           type="button"
           disabled={pending}
-          className="underline disabled:opacity-50"
+          className="btn-link"
           onClick={() => setConfirming(true)}
         >
           Archive this project
@@ -336,7 +336,7 @@ function Settings({
           </p>
           <button
             type="button"
-            className="underline"
+            className="btn-link"
             onClick={() => {
               setConfirming(false);
               void run(async () => void (await setArchived(project.id, true)));
@@ -344,7 +344,7 @@ function Settings({
           >
             Yes, archive it
           </button>
-          <button type="button" className="ml-3 underline" onClick={() => setConfirming(false)}>
+          <button type="button" className="btn-link ml-3" onClick={() => setConfirming(false)}>
             Cancel
           </button>
         </div>
@@ -399,7 +399,7 @@ function CycleLifecycle({
         <button
           type="button"
           disabled={pending}
-          className="rounded bg-gray-900 px-4 py-2 text-white disabled:opacity-50"
+          className="btn btn-primary"
           onClick={() => {
             setPending(true);
             setError(null);
@@ -428,7 +428,7 @@ function CycleLifecycle({
       <button
         type="button"
         disabled={pending}
-        className="rounded bg-gray-900 px-4 py-2 text-white disabled:opacity-50"
+        className="btn btn-primary"
         onClick={() => setConfirming(true)}
       >
         {pending ? "开启中…" : "Start the retrospective"}
@@ -443,7 +443,7 @@ function CycleLifecycle({
           </p>
           <button
             type="button"
-            className="underline"
+            className="btn-link"
             onClick={() => {
               setConfirming(false);
               setPending(true);
@@ -456,7 +456,7 @@ function CycleLifecycle({
           >
             Yes, reveal the cards
           </button>
-          <button type="button" className="ml-3 underline" onClick={() => setConfirming(false)}>
+          <button type="button" className="btn-link ml-3" onClick={() => setConfirming(false)}>
             Cancel
           </button>
         </div>
@@ -584,16 +584,16 @@ function Members({
 
   return (
     <section className="space-y-3">
-      <h2 className="text-xl font-semibold">Members</h2>
+      <h2>Members</h2>
 
       {members.length === 0 ? (
-        <p>No members</p>
+        <p className="empty">No members</p>
       ) : (
         <ul className="space-y-2">
           {members.map((member) => (
             <li
               key={member.user_id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded border p-3"
+              className="card flex flex-wrap items-center justify-between gap-2"
             >
               <div className="min-w-0">
                 <p className="break-words font-medium">{member.display_name}</p>
@@ -603,6 +603,9 @@ function Members({
                   {formatDate(member.joined_at, "unknown date")}
                 </p>
               </div>
+              {/* 右侧控件包在一起,否则 justify-between 会把角色下拉和移除
+                  按钮拆到两头,每一行的对齐还取决于那行有没有移除按钮。 */}
+              <div className="ml-auto flex flex-wrap items-end gap-4">
               {isFacilitator && (
                 <div>
                   <label htmlFor={`role-${member.user_id}`}>
@@ -613,7 +616,7 @@ function Members({
                     value={member.role}
                     disabled={removingId === member.user_id}
                     onChange={(event) => void onRole(member, event.target.value)}
-                    className="rounded border px-2 py-1"
+                   
                   >
                     <option value="member">Member</option>
                     <option value="facilitator">Facilitator</option>
@@ -627,11 +630,12 @@ function Members({
                   type="button"
                   disabled={removingId === member.user_id}
                   onClick={() => setConfirming(member)}
-                  className="underline disabled:opacity-50"
+                  className="btn-link"
                 >
                   {removingId === member.user_id ? "Removing…" : `Remove ${member.display_name}`}
                 </button>
               )}
+              </div>
             </li>
           ))}
         </ul>
@@ -643,10 +647,10 @@ function Members({
         <div role="dialog" aria-modal="true" aria-label="Confirm removal" className="rounded border p-4">
           <p>Remove {confirming.display_name} from this project?</p>
           <div className="flex gap-3">
-            <button type="button" onClick={() => void onRemove(confirming)} className="underline">
+            <button type="button" onClick={() => void onRemove(confirming)} className="btn-link">
               Yes, remove {confirming.display_name}
             </button>
-            <button type="button" onClick={() => setConfirming(null)} className="underline">
+            <button type="button" onClick={() => setConfirming(null)} className="btn-link">
               Cancel
             </button>
           </div>
@@ -665,7 +669,7 @@ function Members({
               onChange={(event) => setEmail(event.target.value)}
               aria-invalid={fieldError ? true : undefined}
               aria-describedby={fieldError ? "invite-email-error" : undefined}
-              className="w-full rounded border px-3 py-2"
+             
             />
             {fieldError && (
               <p id="invite-email-error" role="alert">
@@ -680,7 +684,7 @@ function Members({
               id="invite-role"
               value={role}
               onChange={(event) => setRole(event.target.value)}
-              className="w-full rounded border px-3 py-2"
+             
             >
               <option value="member">Member</option>
               <option value="facilitator">Facilitator</option>
@@ -692,7 +696,7 @@ function Members({
           <button
             type="submit"
             disabled={inviting}
-            className="rounded bg-gray-900 px-4 py-2 text-white disabled:opacity-50"
+            className="btn btn-primary"
           >
             {inviting ? "Inviting…" : "Invite"}
           </button>

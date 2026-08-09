@@ -1,4 +1,4 @@
-import { CATEGORIES, CATEGORY_LABELS, type FeedbackCard } from "../../api/feedback";
+import { CARD_INK, CATEGORIES, CATEGORY_LABELS, type FeedbackCard } from "../../api/feedback";
 import { sortCards } from "../../api/retro";
 import type { DashboardMember } from "../../api/projects";
 
@@ -35,15 +35,15 @@ export function RevealPanel({
         const label = CATEGORY_LABELS[category];
         return (
           <section key={category} className="space-y-2">
-            <h2 className="text-xl font-semibold">{label}</h2>
+            <h2>{label}</h2>
             {inCategory.length === 0 ? (
-              <p>No {label} cards</p>
+              <p className="empty">No {label} cards</p>
             ) : (
               <ul className="space-y-2">
                 {inCategory.map((card) => (
-                  <li key={card.id} className="rounded border p-3">
+                  <li key={card.id} className={`card ${CARD_INK[category]}`}>
                     <p className="break-words">{card.text}</p>
-                    <p className="text-sm">{authorLabel(card, members)}</p>
+                    <p className="meta">{authorLabel(card, members)}</p>
                   </li>
                 ))}
               </ul>
