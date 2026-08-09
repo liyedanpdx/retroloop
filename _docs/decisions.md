@@ -112,9 +112,19 @@ back, and cannot be edited again afterwards, because the author is now unknown.
 Users submit all votes (up to 3) in a single request, not one at a time.
 Prevents partial voting and simplifies the "has everyone voted?" check.
 
-### No vote retraction (issue #8)
-Once submitted, votes cannot be changed. Keeps implementation simple and
-prevents gaming. A "revote" feature can be added post-MVP if needed.
+### Whole-ballot retraction before results open (issues #8, #21)
+A member may withdraw their entire ballot with `DELETE /api/retros/{id}/votes`
+only while the retro is in `vote` and results have never been visible. There is
+no ballot `PUT` or `PATCH`: after a successful delete the member may use the
+existing atomic `POST` to submit a fresh 1-to-3-vote ballot.
+
+Results visibility is monotonic. The retro records when results first open
+(because a successful ballot submission makes every then-current member voted,
+or the facilitator advances to `discuss`); later membership changes neither
+open nor close results and cannot re-enable retraction. If membership changes
+leave the remaining voters ready, the facilitator may advance normally. This
+preserves #8's anti-gaming boundary while giving a member a way to correct a
+mistake before anyone can see the tally.
 
 ## Discussion
 
