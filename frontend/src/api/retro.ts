@@ -23,7 +23,8 @@ export type Cluster = { id: string; name: string; created_at: string };
 export type VoteSubmitter = { user_id: string; submitted_at: string };
 export type Topic = {
   id: string;
-  cluster_id: string;
+  cluster_id: string | null;
+  name_override: string | null;
   name: string;
   vote_count: number;
   rank: number;
@@ -122,10 +123,22 @@ export async function getResults(retroId: string): Promise<VoteResults> {
   return (await api.get<VoteResults>(`/api/retros/${retroId}/votes/results`)).data;
 }
 
+export async function createTopic(
+  retroId: string,
+  body: { name: string; rank?: number }
+): Promise<Topic> {
+  return (await api.post<Topic>(`/api/retros/${retroId}/topics`, body)).data;
+}
+
+export async function deleteTopic(retroId: string, topicId: string): Promise<void> {
+  await api.delete(`/api/retros/${retroId}/topics/${topicId}`);
+}
+
 export async function updateTopic(
   retroId: string,
   topicId: string,
-  body: { status?: string; notes?: string }
+  // name 是覆盖,传 null 清掉就回到 cluster 的名字;rank 是 1 起的位置 (#22)
+  body: { status?: string; notes?: string; name?: string | null; rank?: number }
 ): Promise<Topic> {
   return (await api.patch<Topic>(`/api/retros/${retroId}/topics/${topicId}`, body)).data;
 }

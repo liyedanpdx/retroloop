@@ -9,6 +9,7 @@ import {
   MAX_TRANSCRIPT_CHARS,
   POLL_MS,
   confirmSuggestions,
+  deleteTranscript,
   extractionError,
   getSuggestions,
   pasteTranscript,
@@ -60,6 +61,7 @@ export function TranscriptPage() {
   const [pending, setPending] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [pollError, setPollError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlight = useRef(false);
@@ -332,6 +334,53 @@ export function TranscriptPage() {
             Retry extraction
           </button>
         </div>
+      )}
+
+      {/* #25 的保留控制。任何阶段都能用,包括已发布的回顾 —— 一个在回顾
+          结束后就失效的删除按钮,恰好在最该用的时候没用。 */}
+      {(retro.transcript || suggestions.status !== "idle") && (
+        <section className="space-y-2">
+          <button
+            type="button"
+            disabled={pending}
+            className="btn-link btn-danger"
+            onClick={() => setDeleting(true)}
+          >
+            Delete the stored transcript
+          </button>
+          {deleting && (
+            <div role="dialog" aria-modal="true" aria-label="Delete the stored transcript">
+              <p>
+                删掉存下来的会议原文和它派生的草稿。已经确认过的决定和行动会
+                留下 —— 那是这次回顾自己的记录。这一步没法撤销。
+              </p>
+              <button
+                type="button"
+                className="btn-link"
+                onClick={() => {
+                  setDeleting(false);
+                  setPending(true);
+                  deleteTranscript(retroId)
+                    .then(() => {
+                      setText("");
+                      return load();
+                    })
+                    .catch(() => setFormError(GENERIC_FAILURE))
+                    .finally(() => setPending(false));
+                }}
+              >
+                Yes, delete it
+              </button>
+              <button
+                type="button"
+                className="btn-link ml-3"
+                onClick={() => setDeleting(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </section>
       )}
 
       {suggestions.status === "ready" && (

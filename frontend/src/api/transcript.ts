@@ -116,3 +116,8 @@ export async function getSummary(retroId: string): Promise<Summary> {
 export async function publishSummary(retroId: string): Promise<Summary> {
   return (await api.post<Summary>(`/api/retros/${retroId}/summary/publish`)).data;
 }
+
+/** 删除存下来的会议原文和它派生的草稿 (#25)。已确认的决定和行动不受影响。 */
+export async function deleteTranscript(retroId: string): Promise<void> {
+  await api.delete(`/api/retros/${retroId}/transcript`);
+}

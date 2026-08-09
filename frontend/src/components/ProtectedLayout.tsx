@@ -1,4 +1,4 @@
-import { Outlet } from "react-router-dom";
+import { Link, Outlet } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthProvider";
 
@@ -14,7 +14,11 @@ export function ProtectedLayout() {
   return (
     <div className="min-h-screen">
       <nav className="topbar">
-        <span className="wordmark">RetroLoop</span>
+        {/* 字标是回家的路。之前它只是一段文字,于是从回顾板没有任何
+            办法回到项目列表。 */}
+        <Link to="/projects" className="wordmark" style={{ borderBottom: "none" }}>
+          RetroLoop
+        </Link>
         <div className="flex items-center gap-4">
           {user && <span className="meta">{user.display_name}</span>}
           <button type="button" onClick={() => void logout()} className="btn-link">

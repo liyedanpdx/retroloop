@@ -5,8 +5,10 @@ import {
   TOPIC_STATUSES,
   createAction,
   createDecision,
+  createTopic,
   deleteAction,
   deleteDecision,
+  deleteTopic,
   updateAction,
   updateDecision,
   updateTopic,
@@ -68,6 +70,9 @@ export function DiscussPanel({
     <div className="space-y-6">
       {topics.length === 0 && <p className="empty">No topics were generated — nothing was voted on.</p>}
 
+      {/* 会上有人提了一件没人写过卡的事 —— #22 的接口早就在了,这是它的入口。 */}
+      {isFacilitator && <NewTopic retroId={retro.id} onChanged={onChanged} />}
+
       {groups.map(({ key, title, topic }) => {
         const decisions =
           topic === null
@@ -82,7 +87,18 @@ export function DiscussPanel({
         }
         return (
           <section key={key} className="panel space-y-2">
-            <h3 className="break-words">{title}</h3>
+            <div className="flex flex-wrap items-baseline justify-between gap-3">
+              <h3 className="break-words">{title}</h3>
+              {topic && isFacilitator && (
+                <TopicShape
+                  retroId={retro.id}
+                  topic={topic}
+                  count={topics.length}
+                  onChanged={onChanged}
+                  onConflict={onConflict}
+                />
+              )}
+            </div>
             {topic && (
               <TopicControls
                 retroId={retro.id}
@@ -562,5 +578,209 @@ function Composers({
         </button>
       </form>
     </div>
+  );
+}
+
+
+/**
+ * 一个议题的形状:改名、挪位置、删掉 (#22)。
+ *
+ * 改名是覆盖而不是第二份真相 —— 清掉它就回到 cluster 的名字,所以有覆盖时会
+ * 多出一个「恢复原名」。删除会把它下面的决定和行动解绑成 Unlinked,而不是跟着
+ * 一起删,确认里说的就是这件事。
+ */
+function TopicShape({
+  retroId,
+  topic,
+  count,
+  onChanged,
+  onConflict,
+}: {
+  retroId: string;
+  topic: Topic;
+  count: number;
+  onChanged: () => Promise<void>;
+  onConflict: () => Promise<void>;
+}) {
+  const [renaming, setRenaming] = useState(false);
+  const [draft, setDraft] = useState(topic.name);
+  const [confirming, setConfirming] = useState(false);
+  const { error, pending, run } = useMutation(onConflict);
+
+  if (renaming) {
+    return (
+      <div className="flex flex-wrap items-end gap-2">
+        <div>
+          <label htmlFor={`rename-topic-${topic.id}`}>Rename {topic.name}</label>
+          <input
+            id={`rename-topic-${topic.id}`}
+            value={draft}
+            disabled={pending}
+            onChange={(event) => setDraft(event.target.value)}
+          />
+        </div>
+        <button
+          type="button"
+          disabled={pending}
+          className="btn-link"
+          onClick={() => {
+            const trimmed = draft.trim();
+            if (!trimmed || trimmed === topic.name) {
+              setRenaming(false);
+              return;
+            }
+            void run(async () => {
+              await updateTopic(retroId, topic.id, { name: trimmed });
+              setRenaming(false);
+              await onChanged();
+            });
+          }}
+        >
+          Save the name
+        </button>
+        <button type="button" className="btn-link" onClick={() => setRenaming(false)}>
+          Cancel
+        </button>
+        {error && <p role="alert">{error}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="meta flex flex-wrap items-center gap-3">
+      <button
+        type="button"
+        disabled={pending}
+        className="btn-link"
+        onClick={() => {
+          setDraft(topic.name);
+          setRenaming(true);
+        }}
+      >
+        Rename
+      </button>
+
+      {topic.name_override !== null && (
+        <button
+          type="button"
+          disabled={pending}
+          className="btn-link"
+          onClick={() =>
+            void run(async () => {
+              await updateTopic(retroId, topic.id, { name: null });
+              await onChanged();
+            })
+          }
+        >
+          Restore the original name
+        </button>
+      )}
+
+      <button
+        type="button"
+        disabled={pending || topic.rank <= 1}
+        className="btn-link"
+        onClick={() =>
+          void run(async () => {
+            await updateTopic(retroId, topic.id, { rank: topic.rank - 1 });
+            await onChanged();
+          })
+        }
+      >
+        Move up
+      </button>
+      <button
+        type="button"
+        disabled={pending || topic.rank >= count}
+        className="btn-link"
+        onClick={() =>
+          void run(async () => {
+            await updateTopic(retroId, topic.id, { rank: topic.rank + 1 });
+            await onChanged();
+          })
+        }
+      >
+        Move down
+      </button>
+
+      <button
+        type="button"
+        disabled={pending}
+        className="btn-link btn-danger"
+        onClick={() => setConfirming(true)}
+      >
+        Remove
+      </button>
+
+      {error && <p role="alert">{error}</p>}
+
+      {confirming && (
+        <div role="dialog" aria-modal="true" aria-label={`Remove ${topic.name}`}>
+          <p>
+            把这个议题从议程上拿掉?挂在它下面的决定和行动不会被删,它们会变成
+            Unlinked。
+          </p>
+          <button
+            type="button"
+            className="btn-link"
+            onClick={() => {
+              setConfirming(false);
+              void run(async () => {
+                await deleteTopic(retroId, topic.id);
+                await onChanged();
+              });
+            }}
+          >
+            Yes, remove it
+          </button>
+          <button type="button" className="btn-link ml-3" onClick={() => setConfirming(false)}>
+            Cancel
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** 加一个没人写过卡、但会上提到了的议题 (#22)。 */
+function NewTopic({ retroId, onChanged }: { retroId: string; onChanged: () => Promise<void> }) {
+  const [name, setName] = useState("");
+  const [fieldError, setFieldError] = useState<string | null>(null);
+  const { error, pending, run } = useMutation(onChanged);
+
+  return (
+    <form
+      noValidate
+      className="flex flex-wrap items-end gap-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const trimmed = name.trim();
+        if (!trimmed) {
+          setFieldError("Topic name is required");
+          return;
+        }
+        setFieldError(null);
+        void run(async () => {
+          await createTopic(retroId, { name: trimmed });
+          setName("");
+          await onChanged();
+        });
+      }}
+    >
+      <div>
+        <label htmlFor="new-topic">Add a topic nobody wrote a card for</label>
+        <input
+          id="new-topic"
+          value={name}
+          disabled={pending}
+          onChange={(event) => setName(event.target.value)}
+        />
+      </div>
+      <button type="submit" disabled={pending} className="btn">
+        Add topic
+      </button>
+      {fieldError && <p role="alert">{fieldError}</p>}
+      {error && <p role="alert">{error}</p>}
+    </form>
   );
 }

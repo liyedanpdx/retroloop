@@ -600,6 +600,7 @@ const TOPICS = [
   {
     id: "t2",
     cluster_id: "c2",
+    name_override: null,
     name: "Tooling",
     vote_count: 1,
     rank: 2,
@@ -609,6 +610,7 @@ const TOPICS = [
   {
     id: "t1",
     cluster_id: "c1",
+    name_override: null,
     name: "Flow",
     vote_count: 3,
     rank: 1,

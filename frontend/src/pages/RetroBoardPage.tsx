@@ -26,6 +26,8 @@ import { RetroSocket, type ConnectionStatus, type RetroEvent } from "../realtime
 
 type Loaded = {
   retro: Retro;
+  /** 为了「回到项目」那条面包屑 —— 回顾板本身不知道自己属于谁。 */
+  projectId: string;
   cards: FeedbackCard[];
   members: DashboardMember[];
   isFacilitator: boolean;
@@ -93,6 +95,7 @@ export function RetroBoardPage() {
       setState({
         kind: "ready",
         retro,
+        projectId: cycle.project_id,
         cards,
         members: dashboard.members,
         isFacilitator: me?.role === FACILITATOR,
@@ -187,13 +190,16 @@ export function RetroBoardPage() {
     );
   }
 
-  const { retro, cards, members, isFacilitator, results } = state;
+  const { retro, cards, members, isFacilitator, results, projectId } = state;
   const hasVoted = retro.votes.some((vote) => vote.user_id === user?.id);
 
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-rule pb-4">
         <div className="space-y-2">
+          <p className="meta">
+            <Link to={`/projects/${projectId}`}>← Back to the project</Link>
+          </p>
           <h1>Retrospective</h1>
           <PhaseIndicator phase={retro.phase} />
         </div>
@@ -243,14 +249,28 @@ export function RetroBoardPage() {
           onConflict={load}
         />
       ) : (
-        <DiscussPanel
+        <>
+          {/* #17 把这两页都做好了,但在这之前没有任何地方链接过去 ——
+              转录抽取整页都点不到。 */}
+          <p className="meta flex flex-wrap gap-4">
+            {isFacilitator && (
+              <Link to={`/retros/${retro.id}/transcript`}>
+                Paste the meeting transcript
+              </Link>
+            )}
+            <Link to={`/retros/${retro.id}/summary`}>
+              {isFacilitator ? "Preview and publish the summary" : "Read the summary"}
+            </Link>
+          </p>
+          <DiscussPanel
           retro={retro}
           members={members}
           currentUserId={user?.id}
           isFacilitator={isFacilitator}
           onChanged={load}
-          onConflict={load}
-        />
+            onConflict={load}
+          />
+        </>
       )}
     </div>
   );

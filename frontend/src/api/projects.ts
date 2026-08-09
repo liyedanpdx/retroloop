@@ -159,3 +159,13 @@ export async function createCycle(projectId: string): Promise<NewCycle> {
 export async function startRetro(cycleId: string): Promise<{ id: string }> {
   return (await api.post<{ id: string }>(`/api/cycles/${cycleId}/retro`)).data;
 }
+
+/**
+ * 关闭一个周期 (#4)。
+ *
+ * 这是唯一能结束一个没走到回顾的周期的办法,而且 #32 的归档要求项目没有
+ * 进行中的周期 —— 没有这个入口,一个开过周期的项目就永远归档不了。
+ */
+export async function closeCycle(cycleId: string): Promise<void> {
+  await api.patch(`/api/cycles/${cycleId}`, { status: "closed" });
+}

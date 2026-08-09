@@ -5,6 +5,7 @@ import { isAxiosError } from "axios";
 import {
   FACILITATOR,
   addMember,
+  closeCycle,
   createCycle,
   getDashboard,
   getProject,
@@ -375,6 +376,7 @@ function CycleLifecycle({
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [closing, setClosing] = useState(false);
 
   function fail(failure: unknown) {
     const status = isAxiosError(failure) ? failure.response?.status : undefined;
@@ -419,20 +421,56 @@ function CycleLifecycle({
     );
   }
 
-  if (cycle.status !== "collecting") {
-    return null;
-  }
-
   return (
-    <div>
+    <div className="flex flex-wrap items-center gap-4">
+      {cycle.status === "collecting" && (
+        <button
+          type="button"
+          disabled={pending}
+          className="btn btn-primary"
+          onClick={() => setConfirming(true)}
+        >
+          {pending ? "开启中…" : "Start the retrospective"}
+        </button>
+      )}
+
+      {/* 结束一个不打算走到回顾的周期,也是归档项目之前必须做的一步 (#32)。 */}
       <button
         type="button"
         disabled={pending}
-        className="btn btn-primary"
-        onClick={() => setConfirming(true)}
+        className="btn-link"
+        onClick={() => setClosing(true)}
       >
-        {pending ? "开启中…" : "Start the retrospective"}
+        Close this cycle
       </button>
+
+      {closing && (
+        <div role="dialog" aria-modal="true" aria-label="Close this cycle">
+          <p>
+            关闭这个周期?之后谁也不能再往里写反馈
+            {cycle.status === "collecting" ? ",而且它不会再变成一次回顾" : ""}
+            。这一步没法撤销。
+          </p>
+          <button
+            type="button"
+            className="btn-link"
+            onClick={() => {
+              setClosing(false);
+              setPending(true);
+              setError(null);
+              closeCycle(cycle.id)
+                .then(() => onChanged())
+                .catch(fail)
+                .finally(() => setPending(false));
+            }}
+          >
+            Yes, close it
+          </button>
+          <button type="button" className="btn-link ml-3" onClick={() => setClosing(false)}>
+            Cancel
+          </button>
+        </div>
+      )}
       {error && <p role="alert">{error}</p>}
 
       {confirming && (
