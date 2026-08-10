@@ -256,6 +256,33 @@ async def test_open_actions_are_listed_with_owners_and_closed_ones_are_not(
 
 
 @pytest.mark.asyncio
+async def test_completing_an_action_after_publish_drops_it_from_open_actions(
+    client, auth_headers, project_with_member, discussion_retro, advance_phase
+):
+    """#38: publishing does not freeze this one write, and the dashboard shows it."""
+    retro_id = discussion_retro["retro"]["id"]
+    action = await client.post(
+        f"/api/retros/{retro_id}/actions",
+        json={"description": "Write the postmortem"},
+        headers=auth_headers,
+    )
+    await advance_phase(retro_id, "done")
+
+    before = await client.get(_url(project_with_member["id"]), headers=auth_headers)
+    assert action.json()["id"] in [a["id"] for a in before.json()["open_actions"]]
+
+    completed = await client.patch(
+        f"/api/retros/{retro_id}/actions/{action.json()['id']}",
+        json={"status": "done"},
+        headers=auth_headers,
+    )
+    assert completed.status_code == 200, completed.text
+
+    after = await client.get(_url(project_with_member["id"]), headers=auth_headers)
+    assert action.json()["id"] not in [a["id"] for a in after.json()["open_actions"]]
+
+
+@pytest.mark.asyncio
 async def test_an_unresolved_extracted_owner_name_is_shown_as_it_was_extracted(
     client, auth_headers, project_with_member, discussion_retro
 ):

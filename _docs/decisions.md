@@ -193,6 +193,49 @@ Action owners can only update `status` and `due_date` on their own items,
 not `description` or `owner_id`. Only the facilitator can reassign or
 rewrite actions.
 
+### An action outlives its retrospective (issue #38)
+`PATCH /retros/{id}/actions/{id}` now accepts one write after publish:
+`status`, from the facilitator or the action's current-member owner, and
+nothing else. Four questions, answered:
+
+**Who may complete it is exactly who could touch it before.** No new role
+and no override for a departed owner — `get_retro_for_member` already
+refuses a caller who has left the project before `update_action` gets to ask
+who owns what, so an orphaned action (#23) is the facilitator's to close
+after publish the same way it was during `discuss`. Nothing special-cases
+`owner_state: orphaned`; the existing membership check already produces it.
+
+**Completing an action does not touch the published summary**, because
+there was never a snapshot to touch — #11 assembles `GET /summary` from the
+live retro document on every read. A status flip is visible on the next
+read, the same way a rename would have been before publish.
+
+**Deletion stays refused.** `delete_action`'s own reasoning — an owner
+cannot delete their way out of a commitment — gets stronger after the
+meeting, not weaker, and this issue does not reopen it. Cancellation-as-a-
+recorded-event, which the issue raised as an alternative to deletion, is not
+built either: nothing here needed it, and inventing a verb nobody asked for
+yet is not this issue's job.
+
+**The write is a positional single-field update, not a wider exception.**
+`save_action_status()` in `app/services/concurrency.py` sets exactly
+`actions.$.status`, unconditional on `writes_closed_at`, rather than a
+second `save_retro_ignoring_close`-shaped full-document replace — this write
+can move in both directions (`open` ↔ `done`), where #25's can only shrink
+what a retro holds, so the same shape would have been the wrong one. Moving
+actions into their own collection with an independent lifetime — the real
+fix if this needed to generalise — is out of scope: one still-writable field
+does not justify it, and doing it here would be solving a problem this issue
+does not have.
+
+One more thing worth writing down because it is easy to get backwards:
+`update_action` branches on `retro.phase == DONE`, not on `writes_closed_at`.
+The two can diverge — the generic `PATCH /retros/{id}/phase` can reach
+`done` without ever calling `close_retro_writes` (only
+`POST /summary/publish` does that; the frontend's `AdvanceControl` stops one
+phase short of `done` for exactly this reason) — and this issue is about the
+phase a retro is in, not the mechanism that happened to close it.
+
 ## AI extraction
 
 ### AI proxy, not direct OpenAI (issue #10)

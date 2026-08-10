@@ -134,3 +134,27 @@ async def save_retro_ignoring_close(retro: Retrospective) -> None:
     await Retrospective.get_motor_collection().replace_one(
         {"_id": retro.id}, retro.model_dump(by_alias=True)
     )
+
+
+async def save_action_status(retro: Retrospective, action_id: str) -> None:
+    """Write one action's `status`, even once the retro's writes are closed (#38).
+
+    An action's lifetime outlives its retrospective — completing one is the
+    write that has to get through after `close_retro_writes` has run. Scoped
+    the way `save_retro_ignoring_close` is scoped for #25: as narrow as the
+    caller that needs it, and narrower still, since this is a positional
+    update on exactly one action's `status` rather than a full-document
+    replace. It cannot clobber a concurrent write to anything else on the
+    document, because it does not touch anything else on the document.
+
+    The caller has already decided this write is allowed — that decision is
+    `update_action`'s phase branch, not this function's. This only persists
+    it, and takes the action's *current* in-memory `status`, so the caller
+    must set that first.
+    """
+    result = await Retrospective.get_motor_collection().update_one(
+        {"_id": retro.id, "actions.id": action_id},
+        {"$set": {"actions.$.status": next(a for a in retro.actions if a.id == action_id).status}},
+    )
+    if result.matched_count != 1:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Action not found")

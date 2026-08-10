@@ -1076,6 +1076,91 @@ async def test_an_owner_removed_from_the_project_keeps_the_action(
     assert (await _stored(retro["id"])).actions[0].owner_id is None
 
 
+# --- completing an action after publish (#38) ---------------------------------
+
+
+@pytest.mark.asyncio
+async def test_the_owner_completes_and_reopens_an_action_after_publish(
+    client, auth_headers, second_auth_headers, second_user, discussion_retro, advance_phase
+):
+    retro = discussion_retro["retro"]
+    action = await _make_action(client, retro["id"], auth_headers, owner_id=second_user["id"])
+    await advance_phase(retro["id"], "done")
+
+    resp = await _patch_action(
+        client, retro["id"], action["id"], {"status": "done"}, second_auth_headers
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["status"] == "done"
+    assert (await _stored(retro["id"])).actions[0].status == "done"
+
+    reopened = await _patch_action(
+        client, retro["id"], action["id"], {"status": "open"}, second_auth_headers
+    )
+    assert reopened.status_code == 200, reopened.text
+    assert (await _stored(retro["id"])).actions[0].status == "open"
+
+
+@pytest.mark.asyncio
+async def test_the_facilitator_completes_any_action_after_publish(
+    client, auth_headers, discussion_retro, advance_phase
+):
+    retro = discussion_retro["retro"]
+    action = await _make_action(client, retro["id"], auth_headers)  # unassigned
+    await advance_phase(retro["id"], "done")
+
+    resp = await _patch_action(client, retro["id"], action["id"], {"status": "done"}, auth_headers)
+    assert resp.status_code == 200, resp.text
+    assert (await _stored(retro["id"])).actions[0].status == "done"
+
+
+@pytest.mark.asyncio
+async def test_only_status_moves_once_the_retro_is_published(
+    client, auth_headers, discussion_retro, advance_phase
+):
+    """`_docs/decisions.md`: publishing stays one-way. Status is the sole exception."""
+    retro = discussion_retro["retro"]
+    action = await _make_action(client, retro["id"], auth_headers)
+    await advance_phase(retro["id"], "done")
+
+    resp = await _patch_action(
+        client, retro["id"], action["id"],
+        {"status": "done", "description": "sneak this in too"}, auth_headers,
+    )
+    assert resp.status_code == 403, resp.text
+
+    stored = (await _stored(retro["id"])).actions[0]
+    assert stored.status == "open", "the permitted field in the rejected body is not written"
+    assert stored.description == action["description"]
+
+
+@pytest.mark.asyncio
+async def test_an_orphaned_action_is_the_facilitators_alone_after_publish(
+    client, auth_headers, second_auth_headers, second_user, discussion_retro, advance_phase
+):
+    """An owner who has left cannot reach the endpoint at all (#23) -- only the
+    facilitator can close what they left behind, before or after publish."""
+    retro = discussion_retro["retro"]
+    project_id = discussion_retro["cycle"]["project_id"]
+    action = await _make_action(client, retro["id"], auth_headers, owner_id=second_user["id"])
+
+    removed = await client.delete(
+        f"/api/projects/{project_id}/members/{second_user['id']}", headers=auth_headers
+    )
+    assert removed.status_code == 200, removed.text
+
+    await advance_phase(retro["id"], "done")
+
+    refused = await _patch_action(
+        client, retro["id"], action["id"], {"status": "done"}, second_auth_headers
+    )
+    assert refused.status_code == 403, "get_retro_for_member refuses before the owner check"
+
+    closed = await _patch_action(client, retro["id"], action["id"], {"status": "done"}, auth_headers)
+    assert closed.status_code == 200, closed.text
+    assert (await _stored(retro["id"])).actions[0].status == "done"
+
+
 @pytest.mark.asyncio
 async def test_deleting_an_action_twice(client, auth_headers, discussion_retro):
     retro = discussion_retro["retro"]
@@ -1184,7 +1269,7 @@ async def test_every_endpoint_is_refused_in_the_vote_phase(
 async def test_every_endpoint_is_refused_once_the_retro_is_done(
     client, auth_headers, discussion_retro, advance_phase
 ):
-    """After #11 publishes, the whole discussion is frozen."""
+    """After #11 publishes, the whole discussion is frozen -- except one write (#38)."""
     retro = discussion_retro["retro"]
     topic = discussion_retro["topics"][0]
     decision = await _make_decision(client, retro["id"], auth_headers)
@@ -1207,16 +1292,26 @@ async def test_every_endpoint_is_refused_once_the_retro_is_done(
     assert (
         await _post_action(client, retro["id"], {"description": "too late"}, auth_headers)
     ).status_code == 400
+    # #38: `status` is the one field an action still accepts once the retro is
+    # done. Proving it is the *only* new opening: a different field on the same
+    # action is still refused, and so is delete.
     assert (
-        await _patch_action(client, retro["id"], action["id"], {"status": "done"}, auth_headers)
-    ).status_code == 400
+        await _patch_action(
+            client, retro["id"], action["id"], {"description": "too late"}, auth_headers
+        )
+    ).status_code == 403
     assert (
         await _delete_action(client, retro["id"], action["id"], auth_headers)
     ).status_code == 400
 
+    done = await _patch_action(client, retro["id"], action["id"], {"status": "done"}, auth_headers)
+    assert done.status_code == 200, done.text
+
     stored = await _stored(retro["id"])
     assert stored.topics[0].status == "pending"
     assert len(stored.decisions) == 1 and len(stored.actions) == 1
+    assert stored.actions[0].status == "done"
+    assert stored.actions[0].description == action["description"], "untouched by the 403 above"
 
 
 @pytest.mark.asyncio
@@ -1243,11 +1338,16 @@ async def test_check_order_on_the_facilitator_only_endpoints(
 async def test_check_order_on_the_action_patch(
     client, auth_headers, second_auth_headers, registered_user, discussion_retro, advance_phase
 ):
-    """Membership → phase → action lookup → role, so the wrong phase beats 403.
+    """Membership → phase → action lookup → role, in both phase branches (#38).
 
-    The mirror image of the facilitator-only order above, and forced: nobody can
-    know who owns an action until the action has been loaded, and the action
-    cannot be loaded before the phase gate has let the request through.
+    In `discuss`, the mirror image of the facilitator-only order above: nobody
+    can know who owns an action until it has been loaded, and it cannot be
+    loaded before the phase gate lets the request through. Once the retro is
+    `done`, that is no longer a blanket wrong phase for this one endpoint —
+    `update_action` runs its own action-lookup-then-role order there too, so an
+    unknown id still loses to 404 before any role question, and a real id loses
+    to the same facilitator-or-owner rule `discuss` uses rather than to a phase
+    400.
     """
     retro = discussion_retro["retro"]
     action = await _make_action(client, retro["id"], auth_headers, owner_id=registered_user["id"])
@@ -1259,10 +1359,19 @@ async def test_check_order_on_the_action_patch(
 
     await advance_phase(retro["id"], "done")
 
-    wrong_phase = await _patch_action(
+    unknown_after_publish = await _patch_action(
+        client, retro["id"], UNKNOWN_UUID, {"status": "done"}, auth_headers
+    )
+    assert unknown_after_publish.status_code == 404, "id lookup still beats role, once done"
+
+    non_owner_after_publish = await _patch_action(
         client, retro["id"], action["id"], {"status": "done"}, second_auth_headers
     )
-    assert wrong_phase.status_code == 400, "out of phase, the same caller is 400, not 403"
+    assert non_owner_after_publish.status_code == 403, (
+        "#38: done is no longer a blanket wrong phase for this endpoint — a "
+        "non-owner, non-facilitator member is refused by the discuss role rule, "
+        "not by a phase 400"
+    )
 
 
 @pytest.mark.asyncio
