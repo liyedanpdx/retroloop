@@ -334,6 +334,25 @@ describe("the protected layout", () => {
     expect(await screen.findByRole("heading", { name: "Log in to RetroLoop" })).toBeInTheDocument();
     expect(getAccessToken()).toBeNull();
   });
+
+  it("links to the user guide once signed in (#41)", async () => {
+    renderAt("/projects", LIVE_SESSION);
+    await screen.findByRole("heading", { name: "Projects" });
+
+    const guide = screen.getByRole("link", { name: "Guide" });
+    expect(guide).toHaveAttribute(
+      "href",
+      "https://github.com/liyedanpdx/retroloop/blob/develop/docs/user-guide.md"
+    );
+    expect(guide).toHaveAttribute("target", "_blank");
+  });
+
+  it("has no guide link before signing in (#41)", async () => {
+    renderAt("/login", {});
+    await screen.findByRole("heading", { name: "Log in to RetroLoop" });
+
+    expect(screen.queryByRole("link", { name: "Guide" })).not.toBeInTheDocument();
+  });
 });
 
 // --- storage -----------------------------------------------------------------
