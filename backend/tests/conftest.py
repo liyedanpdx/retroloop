@@ -1,3 +1,6 @@
+import asyncio
+import os
+
 import pytest
 from beanie import init_beanie
 from httpx import ASGITransport, AsyncClient
@@ -7,7 +10,15 @@ from app.config import settings
 from app.database import DOCUMENT_MODELS
 from app.main import app
 
-TEST_DB_NAME = f"{settings.mongo_db_name}_test"
+# Under plain `pytest`, one process and one `_test` database, same as always.
+# Under `pytest-xdist` (`-n auto`), each worker is its own process with its own
+# session-scoped Mongo connection and event loop (safe — see `_test_db` below),
+# but every worker still runs the shared, mutating `_test` database's autouse
+# wipe fixture. Without a name per worker, two workers running tests at the
+# same moment would delete each other's in-flight data. `PYTEST_XDIST_WORKER`
+# (e.g. "gw0") is set by xdist and unset otherwise.
+_WORKER = os.environ.get("PYTEST_XDIST_WORKER", "")
+TEST_DB_NAME = f"{settings.mongo_db_name}_test" + (f"_{_WORKER}" if _WORKER else "")
 
 
 class UnstubbedProxyCall(BaseException):
@@ -68,15 +79,43 @@ def ai_proxy(monkeypatch):
     return proxy
 
 
-@pytest.fixture(autouse=True)
-async def init_test_db():
+@pytest.fixture(scope="session")
+async def _test_db():
+    """One connection and one Beanie registration for the whole run.
+
+    Both used to happen per test, which meant every one of ~200 tests paid a
+    fresh TCP/TLS handshake to the real, remote Mongo `_docs/decisions.md`
+    requires — most of a run's wall time was that handshake, not the test.
+    Motor's client is bound to the event loop it is created on, so sharing one
+    here is only safe because `pytest.ini` pins every async test and fixture to
+    the same session-scoped loop; without that this client would break the
+    first time a test tried to use it from a different loop. Beanie's model
+    registration is a one-time effect on the `Document` classes themselves and
+    was always redundant to repeat.
+    """
     client = AsyncIOMotorClient(settings.mongo_url)
     db = client[TEST_DB_NAME]
     await init_beanie(database=db, document_models=DOCUMENT_MODELS)
-    yield
-    for name in await db.list_collection_names():
-        await db[name].delete_many({})
+    yield db
     client.close()
+
+
+@pytest.fixture(autouse=True)
+async def init_test_db(_test_db):
+    """Per-test isolation, without paying for a new connection to get it.
+
+    Every test still starts from an empty database — the same guarantee as
+    before — but wiping collections on a connection that is already open is a
+    local operation, not a network round trip.
+
+    The wipes themselves run concurrently rather than one at a time: each
+    collection's `delete_many` is a separate round trip to the same remote
+    Mongo, and they do not depend on each other, so doing them one after
+    another was paying that latency once per collection for no reason.
+    """
+    yield
+    names = await _test_db.list_collection_names()
+    await asyncio.gather(*(_test_db[name].delete_many({}) for name in names))
 
 
 @pytest.fixture

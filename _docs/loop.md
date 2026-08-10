@@ -50,13 +50,12 @@ the next wakeup picks up the change automatically.
 
 - Backend: confirm `backend/.env` exists first (copy the root `.env` if not
   — never edit its contents). Then, from `backend/`:
-  `timeout 240 conda run -n newpython pytest -q`.
-  A known issue (`_docs/deployment.md`) makes the full suite hang partway
-  through against the real external Mongo — dozens of tests each opening and
-  closing their own connection to a real, non-local box. If it does not
-  finish inside the timeout, treat that as **inconclusive, not passing**: no
-  deploy, comment on the issue explaining the suite hung, stop the cycle.
-  Do not retry.
+  `timeout 180 conda run -n newpython pytest -n auto -q`.
+  The suite runs across every CPU core, each `pytest-xdist` worker against its
+  own database (`_docs/deployment.md`), and finishes in about a minute — well
+  inside the timeout. If it still does not finish inside the timeout, treat
+  that as **inconclusive, not passing**: no deploy, comment on the issue
+  explaining what happened, stop the cycle. Do not retry.
 - Frontend, if touched: `cd frontend && npm run build && npx vitest run`.
 - A real failure (not a timeout): push the branch anyway so it is visible,
   open a PR against `develop` but do not merge it, paste the relevant test
