@@ -18,8 +18,10 @@ import {
   type Dashboard,
   type DashboardCycle,
   type DashboardMember,
+  type OpenAction,
   type Project,
 } from "../api/projects";
+import { updateAction } from "../api/retro";
 import { useAuth } from "../auth/AuthProvider";
 import { emailError } from "../auth/validation";
 import { formatDate } from "../lib/dates";
@@ -169,14 +171,15 @@ export function ProjectDetailPage() {
         ) : (
           <ul className="space-y-2">
             {dashboard.open_actions.map((action) => (
-              <li key={action.id} className="card">
-                <p className="break-words">{action.description}</p>
-                <p>Owner: {action.owner ?? "Unassigned"}</p>
-                <p>Due: {formatDate(action.due_date, "No due date")}</p>
-                <p>
-                  <Link to={`/retros/${action.retro_id}`}>From this retrospective</Link>
-                </p>
-              </li>
+              <OpenActionRow
+                key={action.id}
+                action={action}
+                // #38: the facilitator may close anything; an owner may close
+                // their own. Archiving is read-only for everyone (#32), so the
+                // control goes rather than failing when pressed.
+                canComplete={!archived && (isFacilitator || action.owner_id === user?.id)}
+                onChanged={load}
+              />
             ))}
           </ul>
         )}
@@ -195,6 +198,66 @@ export function ProjectDetailPage() {
         <Settings project={project} archived={archived} onChanged={load} />
       )}
     </div>
+  );
+}
+
+/**
+ * One open action, with a way to close it once the meeting is over (#38).
+ *
+ * Marking it done is the only edit this row offers, and the only one the
+ * backend accepts once the retrospective is published — everything else
+ * about a published retro stays frozen. There is no "reopen" here: this list
+ * only ever shows open actions (the dashboard filters on `status`), so a
+ * completed one simply leaves it on the next load.
+ */
+function OpenActionRow({
+  action,
+  canComplete,
+  onChanged,
+}: {
+  action: OpenAction;
+  canComplete: boolean;
+  onChanged: () => Promise<void>;
+}) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function complete() {
+    setPending(true);
+    setError(null);
+    try {
+      await updateAction(action.retro_id, action.id, { status: "done" });
+      await onChanged();
+    } catch (failure) {
+      setError(
+        isAxiosError(failure) && failure.response?.status === 403
+          ? PERMISSION_CHANGED
+          : GENERIC_FAILURE
+      );
+      setPending(false);
+    }
+  }
+
+  return (
+    <li className="card">
+      <p className="break-words">{action.description}</p>
+      <p>Owner: {action.owner ?? "Unassigned"}</p>
+      <p>Due: {formatDate(action.due_date, "No due date")}</p>
+      <p>
+        <Link to={`/retros/${action.retro_id}`}>From this retrospective</Link>
+      </p>
+      {canComplete && (
+        <button
+          type="button"
+          disabled={pending}
+          className="btn-link"
+          onClick={() => void complete()}
+        >
+          {pending ? "Marking done…" : "Mark done"}
+        </button>
+      )}
+      {error && <p role="alert">{error}</p>}
+    </li>
   );
 }
 

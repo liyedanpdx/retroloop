@@ -20,6 +20,12 @@ Two check orders, and the asymmetry is forced rather than an oversight:
 No endpoint in this module reports a conflict. There is no state conflict left
 to express: double generation is unreachable and re-confirming a decision is a
 legal no-op. The conflict status code appears nowhere below, deliberately.
+
+One exception to "nothing here writes once the retro is done" (#38): action
+`PATCH` still accepts `status` after publish, from the facilitator or the
+action's current-member owner, and nothing else — an action's lifetime is
+longer than its retrospective's, and this is the one write `_docs/decisions.md`
+lets through. See `update_action`'s phase branch.
 """
 
 from uuid import uuid4
@@ -29,7 +35,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from app.deps import get_current_user
 from app.models.project import Project
-from app.models.retro import DISCUSS, Action, Decision, Retrospective, Topic
+from app.models.retro import DISCUSS, DONE, Action, Decision, Retrospective, Topic
 from app.models.user import User
 from app.schemas.discussion import (
     ActionResponse,
@@ -42,7 +48,7 @@ from app.schemas.discussion import (
     UpdateDecisionRequest,
     UpdateTopicRequest,
 )
-from app.services.concurrency import save_retro
+from app.services.concurrency import save_action_status, save_retro
 from app.services.access import (
     get_retro_for_facilitator,
     get_retro_for_member,
@@ -380,17 +386,25 @@ async def update_action(
 ):
     """The one endpoint here an owner may call, and only on their own item.
 
-    The owner may move `status` and `due_date`. A restricted field in the body is
-    a permission failure and not a body-shape one, so it is 403 — and *nothing*
-    in that body is written, not even the fields they were allowed to send. All
-    or nothing, the same rule #8 applies to a ballot mixing a real and an unknown
-    cluster id.
+    In `discuss`, the owner may move `status` and `due_date`; the facilitator may
+    change anything. Once the retro is `done`, only `status` moves, for the
+    facilitator or the action's current-member owner and nobody else (#38) — see
+    `_complete_action_after_publish`.
+
+    A restricted field in the body is a permission failure and not a body-shape
+    one, so it is 403 — and *nothing* in that body is written, not even the
+    fields the caller was allowed to send. All or nothing, the same rule #8
+    applies to a ballot mixing a real and an unknown cluster id.
 
     An action with `owner_id: null` has no owner, so every non-facilitator member
     is refused on it. A facilitator who happens to be the owner keeps full
-    facilitator rights.
+    facilitator rights, in both phases.
     """
     retro = await get_retro_for_member(retro_id, user)
+
+    if retro.phase == DONE:
+        return await _complete_action_after_publish(retro, action_id, body, user)
+
     await require_writable_phase(retro, DISCUSS)
     action = _find_action(retro, action_id)
 
@@ -432,9 +446,57 @@ async def update_action(
     return response
 
 
+async def _complete_action_after_publish(
+    retro: Retrospective, action_id: str, body: UpdateActionRequest, user: User
+) -> ActionResponse:
+    """#38: the one write a published retro still accepts.
+
+    Membership is already checked by the caller, `update_action`. From here it
+    is action lookup — so an unknown id is still 404 before any permission
+    question — then the same facilitator-or-owner rule the `discuss` branch
+    uses, then a field restriction of exactly one field. `status` is the only
+    thing that moves, because publishing is still one-way (#11): everything
+    else about a published retro, including the rest of this very action, stays
+    frozen. An owner who has since left the project cannot reach this at all —
+    `get_retro_for_member` already refused them before `update_action` called
+    here, which is what makes an orphaned action the facilitator's alone to
+    close.
+    """
+    action = _find_action(retro, action_id)
+    project: Project = await load_project_for_retro(retro)
+    sent = body.model_fields_set
+
+    if not project.is_facilitator(user.id) and (
+        action.owner_id is None or action.owner_id != user.id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the facilitator or this action's owner can change it",
+        )
+    if sent - {"status"}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only status may change once the retrospective is published",
+        )
+
+    if "status" in sent and body.status is not None:
+        action.status = body.status
+        await save_action_status(retro, action_id)
+
+    response = _action_response(action, project)
+    await broadcast(str(retro.id), "action_updated", response.model_dump(mode="json"))
+    return response
+
+
 @router.delete("/retros/{retro_id}/actions/{action_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_action(retro_id: str, action_id: str, user: User = Depends(get_current_user)):
-    """Facilitator only — an owner cannot delete their way out of a commitment."""
+    """Facilitator only — an owner cannot delete their way out of a commitment.
+
+    Also true after publish (#38): the endpoint stays behind `_facilitator_retro`,
+    which stays behind `require_writable_phase(retro, DISCUSS)`, so a `done`
+    retro refuses this the same way it refuses everything except the one status
+    write `update_action` now allows through.
+    """
     retro = await _facilitator_retro(retro_id, user)
     _find_action(retro, action_id)
 

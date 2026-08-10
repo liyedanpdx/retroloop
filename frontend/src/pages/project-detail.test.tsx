@@ -241,6 +241,73 @@ describe("the dashboard", () => {
   });
 });
 
+// --- completing an action after publish (#38) ---------------------------------
+
+const BOB_USER = {
+  id: "u2",
+  email: "bob@example.com",
+  display_name: "Bob",
+  created_at: "2026-01-05T00:00:00Z",
+};
+
+describe("completing an open action", () => {
+  it("lets the facilitator mark any action done, and it leaves the list on refetch", async () => {
+    const calls = renderDetail({
+      "GET /api/projects/p1": { status: 200, data: projectDoc() },
+      "GET /api/projects/p1/dashboard": (_call, index) => ({
+        status: 200,
+        data: index === 0 ? FULL_DASHBOARD : { ...FULL_DASHBOARD, open_actions: [] },
+      }),
+      "PATCH /api/retros/r0/actions/a2": {
+        status: 200,
+        data: { ...FULL_DASHBOARD.open_actions[1], status: "done" },
+      },
+    });
+
+    await screen.findByRole("heading", { name: "Team Alpha" });
+    // "Nobody yet" (a2) is unassigned — only the facilitator's row for it.
+    const unassignedRow = screen.getByText("Nobody yet").closest("li")!;
+    fireEvent.click(within(unassignedRow).getByRole("button", { name: "Mark done" }));
+
+    await waitFor(() =>
+      expect(callsTo(calls, "PATCH", "/api/retros/r0/actions/a2")).toHaveLength(1)
+    );
+    expect(callsTo(calls, "PATCH", "/api/retros/r0/actions/a2")[0].body).toEqual({
+      status: "done",
+    });
+    await waitFor(() => expect(screen.getByText("No open actions")).toBeInTheDocument());
+  });
+
+  it("offers the control on a plain member's own action, and not on anyone else's", async () => {
+    renderDetail({
+      "GET /api/auth/me": { status: 200, data: BOB_USER },
+      "GET /api/projects/p1": { status: 200, data: projectDoc() },
+      "GET /api/projects/p1/dashboard": { status: 200, data: FULL_DASHBOARD },
+    });
+    await screen.findByRole("heading", { name: "Team Alpha" });
+
+    const owned = screen.getByText("Pair on the flaky test").closest("li")!;
+    const unassigned = screen.getByText("Nobody yet").closest("li")!;
+    expect(within(owned).getByRole("button", { name: "Mark done" })).toBeInTheDocument();
+    expect(within(unassigned).queryByRole("button", { name: "Mark done" })).not.toBeInTheDocument();
+  });
+
+  it("shows an error and keeps the action listed when the server refuses", async () => {
+    renderDetail({
+      "GET /api/projects/p1": { status: 200, data: projectDoc() },
+      "GET /api/projects/p1/dashboard": { status: 200, data: FULL_DASHBOARD },
+      "PATCH /api/retros/r0/actions/a1": { status: 403 },
+    });
+    await screen.findByRole("heading", { name: "Team Alpha" });
+
+    const owned = screen.getByText("Pair on the flaky test").closest("li")!;
+    fireEvent.click(within(owned).getByRole("button", { name: "Mark done" }));
+
+    expect(await within(owned).findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByText("Pair on the flaky test")).toBeInTheDocument();
+  });
+});
+
 // --- who may change membership ------------------------------------------------
 
 describe("facilitator controls", () => {
