@@ -7,16 +7,28 @@ gets it onto `develop`, and redeploys this machine
 (`docker compose up -d --build` in `/home/paradx/retroloop_test/retroloop`).
 
 It is a lighter-weight variant of the PM → Engineer → QA pipeline in
-`_docs/process.md`: no grooming pass, one agent does fix-test-deploy
-end to end, and it only takes issues small enough to do that safely
-unattended. Anything bigger stays on the normal process.
+`_docs/process.md`: one agent plays every role instead of three separate
+ones, in one pass rather than a human handing off between them, there is
+no separate QA pass, and it only takes issues small enough to do that
+safely unattended. Anything bigger stays on the normal process.
 
 To run it: `/loop` (no interval — self-paced) with the prompt "read
 `_docs/loop.md` and run one cycle." Update this file to change the rules;
-the next wakeup picks up the change automatically.
+the next wakeup picks up the change automatically — but only because that
+next wakeup actually re-reads it. Nothing enforces this outside the
+agent's own behavior: the wakeup prompt says to read this file, and that
+only does anything if it is read with the `Read` tool, fresh off disk,
+every single cycle — never from what an earlier cycle's turn in the
+conversation remembers the rules to be. A long-running session can have
+this file's content summarized out of view before a later cycle fires;
+memory of "what loop.md said" is not this file.
 
 ## Each cycle
 
+0. Read this file, `_docs/loop.md`, in full, with the `Read` tool — even if
+   it was already read earlier in this conversation. This is step 0 and
+   not folded into step 1 so skipping it cannot be a shortcut taken under
+   time pressure.
 1. `gh issue list --state open --repo liyedanpdx/retroloop`. Drop anything
    labeled `blocked`.
 2. Walk the remaining issues lowest-numbered first. For each, check whether
@@ -26,10 +38,39 @@ the next wakeup picks up the change automatically.
    retry an issue on its own.
 3. If every remaining issue is skipped or there are none, stop. No branch, no
    commit, no comment — a no-op cycle should look like one.
-4. Take the first issue nothing skipped. If it reads like a multi-file epic
-   with a long unchecked acceptance list (the way #18 or #33 do) rather than
-   a small bounded bug or task, skip it too and move to the next candidate —
-   do not implement half of a big issue and call it done.
+4. Take the first issue nothing skipped.
+
+## Grooming
+
+If the issue does not already read like a groomed task — no `## Goal`,
+`## Acceptance criteria`, `## Out of scope` and `## Constraints` sections,
+the shape `_docs/task-template.md` lays out — groom it before doing
+anything else that touches code, following `_docs/team/pm.md`: read
+`_docs/decisions.md` first (`_docs/process.md`'s own rule for grooming),
+rewrite the issue using the template, make every acceptance criterion
+something you could point at the screen and check, and write down the
+edge cases the person who filed it did not consider.
+
+`gh issue edit <N> --body <groomed body>` so the issue on GitHub becomes
+the groomed version — the issue itself, not a comment alongside the
+original, the way a human PM would leave it for the next person. Leave a
+short comment noting it was groomed by the automated loop, so a human
+reading it later knows why the body changed shape.
+
+Then judge the freshly-groomed issue the same as any other, below — small
+enough, keep going in this same cycle and implement it; it turned out
+bigger than it read, stop and move to the next candidate instead. Most
+issues worth filing this tersely are small once written out; do not make
+grooming-then-implementing-in-the-same-pass the exception.
+
+## Sizing
+
+If the issue — freshly groomed or already written this way — reads like a
+multi-file epic with a long unchecked acceptance list (the way #18 or #33
+do) rather than a small bounded bug or task, skip it and move to the next
+candidate. Do not implement half of a big issue and call it done; a task
+that grooming turned out to be this big belongs on the full
+`_docs/process.md` pipeline, not this loop.
 
 ## Implementing
 
