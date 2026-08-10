@@ -97,6 +97,44 @@ describe("the project list", () => {
     expect(screen.getByRole("button", { name: "New Project" })).toBeInTheDocument();
   });
 
+  it("shows only active projects by default, archived ones under their own tab (#43)", async () => {
+    const calls = renderAt("/projects", {
+      "GET /api/projects": {
+        status: 200,
+        data: [
+          project({ id: "a1", name: "Active One" }),
+          project({ id: "z1", name: "Archived One", archived_at: "2026-04-01T00:00:00Z" }),
+        ],
+      },
+    });
+
+    await screen.findByRole("heading", { name: "Active One" });
+    expect(screen.queryByRole("heading", { name: "Archived One" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Archived" }));
+
+    expect(await screen.findByRole("heading", { name: "Archived One" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Active One" })).not.toBeInTheDocument();
+    // Switching tabs is a client-side filter of what's already loaded, not a refetch.
+    expect(callsTo(calls, "GET", "/api/projects")).toHaveLength(1);
+  });
+
+  it("has a distinct empty state per tab", async () => {
+    renderAt("/projects", {
+      "GET /api/projects": { status: 200, data: [project({ id: "a1" })] },
+    });
+
+    await screen.findByRole("heading", { name: "Team Alpha" });
+    expect(screen.getByRole("button", { name: "New Project" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Archived" }));
+
+    expect(await screen.findByText("No archived projects.")).toBeInTheDocument();
+    expect(screen.queryByText(/No projects yet/)).not.toBeInTheDocument();
+    // Creating one is not tied to either tab.
+    expect(screen.getByRole("button", { name: "New Project" })).toBeInTheDocument();
+  });
+
   it("offers Retry after a failure, and recovers", async () => {
     let status = 500;
     const calls = renderAt("/projects", {

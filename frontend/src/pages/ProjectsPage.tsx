@@ -13,11 +13,16 @@ import { formatDate } from "../lib/dates";
 
 const GENERIC_FAILURE = "Something went wrong. Please try again.";
 
+// #43: split on the one status the product already tracks (`archived_at`),
+// client-side, so switching tabs is instant and never refetches.
+type Tab = "active" | "archived";
+
 export function ProjectsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>("active");
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -134,31 +139,78 @@ export function ProjectsPage() {
         </div>
       )}
 
-      {projects !== null && projects.length === 0 && (
-        <p className="empty">No projects yet. Create one to get started.</p>
-      )}
+      {projects !== null && (
+        <>
+          <div role="tablist" aria-label="Projects" className="flex gap-4">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "active"}
+              onClick={() => setTab("active")}
+              className={tab === "active" ? "font-semibold" : "btn-link"}
+            >
+              Active
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "archived"}
+              onClick={() => setTab("archived")}
+              className={tab === "archived" ? "font-semibold" : "btn-link"}
+            >
+              Archived
+            </button>
+          </div>
 
-      {projects !== null && projects.length > 0 && (
-        <ul className="grid gap-4 sm:grid-cols-2">
-          {projects.map((project) => {
-            const role = roleIn(project, user?.id);
-            return (
-              <li key={project.id} className="panel">
-                <h2 className="text-lg font-semibold">
-                  <Link to={`/projects/${project.id}`}>{project.name}</Link>
-                </h2>
-                {project.description && <p className="break-words">{project.description}</p>}
-                <p>
-                  {project.members.length}{" "}
-                  {project.members.length === 1 ? "member" : "members"}
-                  {role ? ` · you are ${role === "facilitator" ? "a facilitator" : "a member"}` : ""}
-                </p>
-                <p>Created {formatDate(project.created_at, "date unknown")}</p>
-              </li>
-            );
-          })}
-        </ul>
+          <ProjectList projects={projects} tab={tab} currentUserId={user?.id} />
+        </>
       )}
     </section>
+  );
+}
+
+function ProjectList({
+  projects,
+  tab,
+  currentUserId,
+}: {
+  projects: Project[];
+  tab: Tab;
+  currentUserId: string | undefined;
+}) {
+  // Already ordered by `orderProjects` before this ever renders; filtering
+  // here keeps each tab's relative order rather than re-sorting it.
+  const visible = projects.filter((project) =>
+    tab === "active" ? project.archived_at === null : project.archived_at !== null
+  );
+
+  if (visible.length === 0) {
+    return (
+      <p className="empty">
+        {tab === "active" ? "No projects yet. Create one to get started." : "No archived projects."}
+      </p>
+    );
+  }
+
+  return (
+    <ul className="grid gap-4 sm:grid-cols-2">
+      {visible.map((project) => {
+        const role = roleIn(project, currentUserId);
+        return (
+          <li key={project.id} className="panel">
+            <h2 className="text-lg font-semibold">
+              <Link to={`/projects/${project.id}`}>{project.name}</Link>
+            </h2>
+            {project.description && <p className="break-words">{project.description}</p>}
+            <p>
+              {project.members.length}{" "}
+              {project.members.length === 1 ? "member" : "members"}
+              {role ? ` · you are ${role === "facilitator" ? "a facilitator" : "a member"}` : ""}
+            </p>
+            <p>Created {formatDate(project.created_at, "date unknown")}</p>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
