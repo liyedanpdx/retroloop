@@ -510,14 +510,40 @@ to whatever MongoDB the team uses.
 
 ### Tests run against a real MongoDB, in their own database
 There is no in-process Mongo. `tests/conftest.py` points at `MONGO_URL` and uses
-the database named `{MONGO_DB_NAME}_test`, wiping its collections between tests.
-Two consequences worth knowing before running the suite:
+a database named `{MONGO_DB_NAME}_test`, wiping its collections between tests.
+`MONGO_DB_NAME` must never name a database that holds anything you care about
+— the teardown empties every collection in `{name}_test`.
 
-- The suite is slow — roughly three minutes for ~100 tests, because every test
-  pays a round trip to init Beanie and another to clean up. Budget for it rather
-  than assuming a hang.
-- `MONGO_DB_NAME` must never name a database that holds anything you care about.
-  The teardown empties every collection in `{name}_test`.
+### One connection per worker, not one per test, and `pytest-xdist` in parallel
+Opening and closing a real `AsyncIOMotorClient` for every one of ~600 tests
+made the suite take fifteen-plus minutes, most of it connection setup rather
+than test logic. `tests/conftest.py` now opens the connection (and registers
+Beanie's models) once per **worker** and reuses it for every test that worker
+runs; only the per-test collection wipe, which needs to happen every time for
+isolation, still runs per test — and even that runs its deletes concurrently
+across collections rather than one at a time, since they do not depend on each
+other.
+
+Sharing a client across tests is only safe because every async test and
+fixture is pinned to one event loop per worker — `pytest.ini`'s
+`asyncio_default_fixture_loop_scope` / `asyncio_default_test_loop_scope =
+session`. Motor's client is bound to the loop that created it; without this,
+a shared client breaks the first time a later test tries to use it from a
+different loop.
+
+`pytest-xdist>=3.6` (`pytest -n auto`) is the dependency this issue's fix
+needed — `AGENTS.md` requires one for any new backend dependency, granted here
+because there was no other way to turn "614 tests, each paying real network
+latency" into something an unattended `/loop` cycle can wait out inside a
+sane timeout. It splits the suite across every CPU core, each worker its own
+process with its own event loop and its own Mongo connection. Workers still
+share the wipe-between-tests design, so each is given its own database —
+`TEST_DB_NAME` suffixed with `PYTEST_XDIST_WORKER` (`gw0`, `gw1`, …) — or two
+workers would delete each other's in-flight data. Plain `pytest` (no `-n`)
+still works exactly as before, one process, one `_test` database.
+
+Net effect: the full suite went from fifteen-plus minutes, sometimes missing
+`_docs/loop.md`'s timeout outright, to about a minute.
 
 ### Secrets live in an untracked .env, never in the repo
 `.env` at the repo root (compose) and `backend/.env` (pytest and uvicorn, which

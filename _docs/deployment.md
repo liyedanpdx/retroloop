@@ -95,17 +95,22 @@ Building that env surfaced two more things:
   process env vars, and pydantic-settings' env-var source looks up fields by
   name rather than validating everything present. Fixed by adding
   `"extra": "ignore"`.
-- Running the full suite (or even one file to the end) against the real
-  external Mongo hangs partway through — individual files and even individual
-  parametrized cases pass in isolation in seconds, but a couple dozen
-  DB-touching tests run back to back in one process stalls indefinitely.
-  `tests/conftest.py`'s `init_test_db` fixture opens a fresh
-  `AsyncIOMotorClient` per test and closes it in teardown, which is correct
-  but means dozens of rapid real connect/close cycles against one external
-  Mongo box — a self-hosted one over LAN, not an idealized local one. Not
-  chased further this round; whatever automation runs this suite should wrap
-  it in a hard timeout and treat a timeout as inconclusive (no deploy, flag
-  it) rather than let it hang.
+- Running the full suite used to take fifteen-plus minutes against the real
+  external Mongo — a self-hosted box over LAN, not an idealized local one —
+  and occasionally missed a much shorter automation timeout entirely.
+  `tests/conftest.py`'s `init_test_db` fixture opened a fresh
+  `AsyncIOMotorClient` per test and closed it in teardown, which was correct
+  but meant every one of ~600 tests paid a real connect/close round trip
+  before it could run at all. Fixed two ways: the connection (and Beanie's
+  model registration) now happens once per **worker** instead of once per
+  **test** — safe only because `pytest.ini` pins every async test and fixture
+  to one event loop per worker (`asyncio_default_fixture_loop_scope` /
+  `asyncio_default_test_loop_scope = session`), which is what a shared Motor
+  client requires — and `pytest-xdist` (`pytest -n auto`) spreads the suite
+  across every CPU core, each worker against its own database
+  (`TEST_DB_NAME` suffixed with `PYTEST_XDIST_WORKER`) so workers never race
+  each other's per-test cleanup. The full suite now finishes in about a
+  minute.
 
 **Backend would not import: `email-validator is not installed`.** `User`
 (`backend/app/models/user.py`) uses `pydantic.EmailStr`, which pydantic only
@@ -187,7 +192,7 @@ The stack coming up is not the same as the change being right. Both suites run
 outside Docker and are much faster there:
 
 ```bash
-cd backend && pytest -q               # 612 tests
+cd backend && pytest -n auto -q       # 614 tests, in parallel
 cd frontend && npm run build && npx vitest run
 ```
 
