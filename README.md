@@ -3,6 +3,10 @@
 A team retrospective tool: collect Start/Stop/Continue feedback, reveal it,
 cluster it, vote on it, discuss it, and publish a summary.
 
+**New to using RetroLoop, rather than running it?** See the
+[user guide](docs/user-guide.md) for what each phase does and how a
+retrospective moves through them.
+
 ## Before you start
 
 You need two things:
