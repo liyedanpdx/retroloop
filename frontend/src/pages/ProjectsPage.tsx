@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { isAxiosError } from "axios";
 
+import { getMyActions, type MyAction } from "../api/actions";
 import {
   createProject,
   listProjects,
@@ -8,6 +10,7 @@ import {
   roleIn,
   type Project,
 } from "../api/projects";
+import { updateAction } from "../api/retro";
 import { useAuth } from "../auth/AuthProvider";
 import { formatDate } from "../lib/dates";
 
@@ -126,6 +129,8 @@ export function ProjectsPage() {
         </form>
       )}
 
+      <MyActionsSection />
+
       {projects === null && !loadError && (
         <p role="status">Loading your projects…</p>
       )}
@@ -166,6 +171,108 @@ export function ProjectsPage() {
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * Every open action the signed-in user owns, across every project (#45).
+ *
+ * Loads independently of the project list below it — one section failing to
+ * load says nothing about the other — and a "Mark done" removes a row from
+ * this list the same way it does on a single project's page (#38): call the
+ * existing per-retro endpoint, drop the row locally once that succeeds.
+ */
+function MyActionsSection() {
+  const [actions, setActions] = useState<MyAction[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoadError(null);
+    setActions(null);
+    try {
+      setActions(await getMyActions());
+    } catch {
+      setLoadError("We could not load your actions.");
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  return (
+    <section className="space-y-2">
+      <h2>My open actions</h2>
+
+      {actions === null && !loadError && <p role="status">Loading your actions…</p>}
+
+      {loadError && (
+        <div role="alert" className="space-y-2">
+          <p>{loadError}</p>
+          <button type="button" onClick={() => void load()} className="btn-link">
+            Retry
+          </button>
+        </div>
+      )}
+
+      {actions !== null && actions.length === 0 && (
+        <p className="empty">No open actions assigned to you.</p>
+      )}
+
+      {actions !== null && actions.length > 0 && (
+        <ul className="space-y-2">
+          {actions.map((action) => (
+            <MyActionRow
+              key={action.id}
+              action={action}
+              onDone={() =>
+                setActions((current) =>
+                  (current ?? []).filter((row) => row.id !== action.id)
+                )
+              }
+            />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function MyActionRow({ action, onDone }: { action: MyAction; onDone: () => void }) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function complete() {
+    setPending(true);
+    setError(null);
+    try {
+      await updateAction(action.retro_id, action.id, { status: "done" });
+      onDone();
+    } catch (failure) {
+      setError(
+        isAxiosError(failure) && failure.response?.status === 403
+          ? "You can no longer make this change."
+          : "Something went wrong. Please try again."
+      );
+      setPending(false);
+    }
+  }
+
+  return (
+    <li className="card">
+      <p className="break-words">{action.description}</p>
+      <p>
+        <Link to={`/projects/${action.project_id}`}>{action.project_name}</Link>
+      </p>
+      <p>Due: {formatDate(action.due_date, "No due date")}</p>
+      <p>
+        <Link to={`/retros/${action.retro_id}`}>From this retrospective</Link>
+      </p>
+      <button type="button" disabled={pending} className="btn-link" onClick={() => void complete()}>
+        {pending ? "Marking done…" : "Mark done"}
+      </button>
+      {error && <p role="alert">{error}</p>}
+    </li>
   );
 }
 
