@@ -15,6 +15,9 @@ import { ALICE, callsTo, installHttp, type Handler, type Reply } from "../test-u
 const SESSION: Record<string, Handler | Reply> = {
   "POST /api/auth/refresh": { status: 200, data: { access_token: "fresh" } },
   "GET /api/auth/me": { status: 200, data: ALICE },
+  // #45: every render of this page also loads "My open actions". Empty by
+  // default so tests that predate that section don't have to know about it.
+  "GET /api/actions/mine": { status: 200, data: [] },
 };
 
 function project(overrides: Partial<Record<string, unknown>> = {}) {
@@ -59,8 +62,13 @@ describe("the project list", () => {
 
     expect(await screen.findByText("Loading your projects…")).toBeInTheDocument();
 
-    const headings = await screen.findAllByRole("heading", { level: 2 });
-    expect(headings.map((heading) => heading.textContent)).toEqual(["Beta", "Newer", "Older"]);
+    // "My open actions" (#45) is also an <h2>, mounted before the project
+    // list's own fetch resolves — wait for a project heading specifically
+    // before reading "every" level-2 heading off the page.
+    await screen.findByRole("heading", { name: "Beta" });
+    const headings = screen.getAllByRole("heading", { level: 2 });
+    const projectHeadings = headings.filter((heading) => heading.textContent !== "My open actions");
+    expect(projectHeadings.map((heading) => heading.textContent)).toEqual(["Beta", "Newer", "Older"]);
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
@@ -147,6 +155,111 @@ describe("the project list", () => {
 
     expect(await screen.findByRole("heading", { name: "Team Alpha" })).toBeInTheDocument();
     expect(callsTo(calls, "GET", "/api/projects")).toHaveLength(2);
+  });
+});
+
+// --- my open actions (#45) ----------------------------------------------------
+
+function myAction(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: "a1",
+    project_id: "p1",
+    project_name: "Team Alpha",
+    retro_id: "r1",
+    description: "Write the runbook",
+    due_date: null,
+    ...overrides,
+  };
+}
+
+describe("my open actions", () => {
+  it("shows every action assigned to the caller, across projects", async () => {
+    renderAt("/projects", {
+      "GET /api/projects": { status: 200, data: [] },
+      "GET /api/actions/mine": {
+        status: 200,
+        data: [
+          myAction({ id: "a1", description: "From Alpha" }),
+          myAction({ id: "a2", description: "From Beta", project_id: "p2", project_name: "Team Beta" }),
+        ],
+      },
+    });
+
+    expect(await screen.findByRole("heading", { name: "My open actions" })).toBeInTheDocument();
+    const alpha = (await screen.findByText("From Alpha")).closest("li")!;
+    expect(within(alpha).getByRole("link", { name: "Team Alpha" })).toHaveAttribute(
+      "href",
+      "/projects/p1"
+    );
+    expect(within(alpha).getByRole("link", { name: "From this retrospective" })).toHaveAttribute(
+      "href",
+      "/retros/r1"
+    );
+
+    const beta = (await screen.findByText("From Beta")).closest("li")!;
+    expect(within(beta).getByRole("link", { name: "Team Beta" })).toHaveAttribute(
+      "href",
+      "/projects/p2"
+    );
+  });
+
+  it("has its own empty state, independent of the projects list", async () => {
+    renderAt("/projects", {
+      "GET /api/projects": { status: 200, data: [] },
+      "GET /api/actions/mine": { status: 200, data: [] },
+    });
+
+    expect(await screen.findByText("No open actions assigned to you.")).toBeInTheDocument();
+    expect(screen.getByText(/No projects yet/)).toBeInTheDocument();
+  });
+
+  it("marks an action done and drops it from the list", async () => {
+    const calls = renderAt("/projects", {
+      "GET /api/projects": { status: 200, data: [] },
+      "GET /api/actions/mine": { status: 200, data: [myAction()] },
+      "PATCH /api/retros/r1/actions/a1": { status: 200, data: { ...myAction(), status: "done" } },
+    });
+
+    await screen.findByText("Write the runbook");
+    fireEvent.click(screen.getByRole("button", { name: "Mark done" }));
+
+    await waitFor(() =>
+      expect(screen.queryByText("Write the runbook")).not.toBeInTheDocument()
+    );
+    expect(callsTo(calls, "PATCH", "/api/retros/r1/actions/a1")[0].body).toEqual({
+      status: "done",
+    });
+    expect(await screen.findByText("No open actions assigned to you.")).toBeInTheDocument();
+  });
+
+  it("shows an error and keeps the action when marking done fails", async () => {
+    renderAt("/projects", {
+      "GET /api/projects": { status: 200, data: [] },
+      "GET /api/actions/mine": { status: 200, data: [myAction()] },
+      "PATCH /api/retros/r1/actions/a1": { status: 403 },
+    });
+
+    await screen.findByText("Write the runbook");
+    fireEvent.click(screen.getByRole("button", { name: "Mark done" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("no longer make this change");
+    expect(screen.getByText("Write the runbook")).toBeInTheDocument();
+  });
+
+  it("offers Retry on failure, independent of the projects list's own error", async () => {
+    let status = 500;
+    const calls = renderAt("/projects", {
+      "GET /api/projects": { status: 200, data: [] },
+      "GET /api/actions/mine": () =>
+        status === 500 ? { status } : { status: 200, data: [myAction()] },
+    });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("could not load your actions");
+    status = 200;
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    expect(await screen.findByText("Write the runbook")).toBeInTheDocument();
+    expect(callsTo(calls, "GET", "/api/actions/mine")).toHaveLength(2);
   });
 });
 
